@@ -1,0 +1,25 @@
+{
+  "name": "perspectives-proxy",
+  "version": "1.0.0",
+  "description": "Exposes perspectives-core either through TCP or a channel based on coroutines for apps with integrated core.",
+  "scripts": {
+    "test": "echo \"Error: no test specified\" && exit 1"
+  },
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/joopringelberg/perspectives-proxy.git"
+  },
+  "keywords": [
+    "perspectives",
+    "react"
+  ],
+  "author": "Joop Ringelberg <joop.ringelberg@gmail.com>",
+  "license": "Copyright Perspect-IT 2018",
+  "private": true,
+  "bugs": {
+    "url": "https://github.com/joopringelberg/perspectives-proxy/issues"
+  },
+  "homepage": "https://github.com/joopringelberg/perspectives-proxy#readme",
+  "dependencies": {
+  }
+}
