@@ -43,6 +43,7 @@ var TcpChannel = function () {
     _classCallCheck(this, TcpChannel);
 
     var connection = void 0;
+    this.requestId = -1;
     var valueReceivers = {};
     this.connection = require("net").createConnection(options,
     // message will be in base64. Appending a string to it converts it to a new string.

@@ -46,6 +46,7 @@ class TcpChannel
   constructor (options)
   {
     let connection;
+    this.requestId = -1;
     const valueReceivers = {};
     this.connection = require("net").createConnection(
       options,
