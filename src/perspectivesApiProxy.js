@@ -58,27 +58,46 @@ class TcpChannel
       });
     connection = this.connection;
     this.valueReceivers = valueReceivers;
-    this.connection.on(
-      "error",
-      function (error)
+
+    // https://nodejs.org/docs/latest-v6.x/api/net.html#net_event_error
+    // Emitted when an error occurs. The 'close' event will be called
+    // directly following this event.
+    connection.on('error',
+      function(error)
       {
-        connection.close(
-          function ()
-          {
-            // We cannot signal the server, because the connection is in error.
-            window.log( "Connection to Perspectives server is closed because: " + error);
-          });
-      });
-    this.connection.on(
-      "end",
-      function ()
-      {
-        // Emitted when the other end of the socket sends a FIN packet.
-        // By default (allowHalfOpen == false) the socket will destroy its file
-        // descriptor once it has written out its pending write queue.
-        // Hence, we need not signal the server that this message emitter shuts down.
+        console.log( "Error on the connection: " + error );
+        // Half-closes the socket. i.e., it sends a FIN packet.
+        // It is possible the server will still send some data.
+        connection.end();
       });
 
+    // https://nodejs.org/docs/latest-v6.x/api/net.html#net_event_close
+    // Emitted once the socket is fully closed. The argument had_error is a boolean
+    // which says if the socket was closed due to a transmission error.
+    connection.on('close',
+      function(had_error)
+      {
+        // No data will come anymore.
+        if ( had_error )
+        {
+          console.log("The Perspectives Core has hung up because of an error.")
+        }
+        else
+        {
+          console.log("The Perspectives Core has hung up.")
+        }
+      });
+
+      // https://nodejs.org/docs/latest-v6.x/api/net.html#net_event_end
+      // Emitted when the other end of the socket sends a FIN packet.
+      // By default (allowHalfOpen == false) the socket will destroy its file
+      // descriptor once it has written out its pending write queue.
+      connection.on('end',
+        function()
+        {
+          // This means the other side will no longer send data.
+          console.log("The Perspectives Core has hung up.")
+        });
   }
 
   nextRequestId ()
@@ -87,10 +106,9 @@ class TcpChannel
     return this.requestId;
   }
 
-  // close will lead messageProducer to receive (Right unit).
+  // close will lead the messageProducer of the perspectives core to receive (Right unit).
   close()
   {
-    this.connection.write("shutdown");
     this.connection.end();
     this.send = function()
     {
