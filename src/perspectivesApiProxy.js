@@ -28,8 +28,6 @@ function createRequestEmitterImpl (left, right, emit)
 // type Host = String
 function createTcpConnectionToPerspectives (options)
 {
-  // Resolve the Perspectives promise made above for the proxy.
-  resolver(new PerspectivesProxy(new TcpChannel(options)));
   try
   {
     // Resolve the Perspectives promise made above for the proxy.
@@ -51,13 +49,34 @@ class TcpChannel
     this.connection = require("net").createConnection(
       options,
       // message will be in base64. Appending a string to it converts it to a new string.
-      function (message)
+      function ()
       {
-        const {setterId, objects} = JSON.parse(message + "");
-        valueReceivers[setterId](objects);
+        console.log("Connection made.")
       });
     connection = this.connection;
     this.valueReceivers = valueReceivers;
+
+    connection.on('data',
+      // message will be in base64. Appending a string to it converts it to a new string.
+      function (message)
+      {
+        const messages = (message + "").split("\n");
+        messages.forEach( function(m)
+        {
+          if (m !== "")
+          {
+            try
+            {
+              const {setterId, objects} = JSON.parse(m);
+              valueReceivers[setterId](objects);
+            }
+            catch(e)
+            {
+              console.log(e);
+            }
+          }
+        });
+      });
 
     // https://nodejs.org/docs/latest-v6.x/api/net.html#net_event_error
     // Emitted when an error occurs. The 'close' event will be called
@@ -103,7 +122,7 @@ class TcpChannel
   nextRequestId ()
   {
     this.requestId = this.requestId + 1;
-    return this.requestId;
+    return this.requestId.toString();
   }
 
   // close will lead the messageProducer of the perspectives core to receive (Right unit).
@@ -126,7 +145,7 @@ class TcpChannel
   {
     req.setterId = this.nextRequestId();
     this.valueReceivers[ req.setterId ] = receiveValues;
-    this.connection.write(JSON.stringify(req));
+    this.connection.write(JSON.stringify(req) + "\n");
   }
 
   unsubscribe(req)

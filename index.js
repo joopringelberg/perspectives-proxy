@@ -28,8 +28,6 @@ function createRequestEmitterImpl(left, right, emit) {
 // type Port = Int
 // type Host = String
 function createTcpConnectionToPerspectives(options) {
-  // Resolve the Perspectives promise made above for the proxy.
-  resolver(new PerspectivesProxy(new TcpChannel(options)));
   try {
     // Resolve the Perspectives promise made above for the proxy.
     resolver(new PerspectivesProxy(new TcpChannel(options)));
@@ -47,15 +45,30 @@ var TcpChannel = function () {
     var valueReceivers = {};
     this.connection = require("net").createConnection(options,
     // message will be in base64. Appending a string to it converts it to a new string.
-    function (message) {
-      var _JSON$parse = JSON.parse(message + ""),
-          setterId = _JSON$parse.setterId,
-          objects = _JSON$parse.objects;
-
-      valueReceivers[setterId](objects);
+    function () {
+      console.log("Connection made.");
     });
     connection = this.connection;
     this.valueReceivers = valueReceivers;
+
+    connection.on('data',
+    // message will be in base64. Appending a string to it converts it to a new string.
+    function (message) {
+      var messages = (message + "").split("\n");
+      messages.forEach(function (m) {
+        if (m !== "") {
+          try {
+            var _JSON$parse = JSON.parse(m),
+                setterId = _JSON$parse.setterId,
+                objects = _JSON$parse.objects;
+
+            valueReceivers[setterId](objects);
+          } catch (e) {
+            console.log(e);
+          }
+        }
+      });
+    });
 
     // https://nodejs.org/docs/latest-v6.x/api/net.html#net_event_error
     // Emitted when an error occurs. The 'close' event will be called
@@ -93,7 +106,7 @@ var TcpChannel = function () {
     key: "nextRequestId",
     value: function nextRequestId() {
       this.requestId = this.requestId + 1;
-      return this.requestId;
+      return this.requestId.toString();
     }
 
     // close will lead the messageProducer of the perspectives core to receive (Right unit).
@@ -119,7 +132,7 @@ var TcpChannel = function () {
     value: function send(req, receiveValues) {
       req.setterId = this.nextRequestId();
       this.valueReceivers[req.setterId] = receiveValues;
-      this.connection.write(JSON.stringify(req));
+      this.connection.write(JSON.stringify(req) + "\n");
     }
   }, {
     key: "unsubscribe",
