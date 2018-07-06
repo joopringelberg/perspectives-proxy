@@ -2,10 +2,12 @@
   "name": "perspectives-proxy",
   "version": "1.0.0",
   "description": "Exposes perspectives-core either through TCP or a channel based on coroutines for apps with integrated core.",
+  "main": "dist/perspectives-proxy.js",
   "scripts": {
-  "test": "echo \"Error: no test specified\" && exit 1",
-  "build": "./node_modules/.bin/babel ./src/perspectivesApiProxy.js > index.js"
-    },
+    "test": "echo \"Error: no test specified\" && exit 1",
+    "build": "webpack",
+    "watch": "webpack --watch"
+  },
   "repository": {
     "type": "git",
     "url": "git+https://github.com/joopringelberg/perspectives-proxy.git"
@@ -20,10 +22,12 @@
     "url": "https://github.com/joopringelberg/perspectives-proxy/issues"
   },
   "homepage": "https://github.com/joopringelberg/perspectives-proxy#readme",
-  "dependencies": {
-  },
+  "dependencies": {},
   "devDependencies": {
-  "babel-cli": "^6.26.0",
-  "babel-preset-env": "^1.7.0"
+    "babel-cli": "^6.26.0",
+    "babel-loader": "^7.1.5",
+    "babel-preset-env": "^1.7.0",
+    "webpack": "^4.15.1",
+    "webpack-cli": "^3.0.8"
   }
 }

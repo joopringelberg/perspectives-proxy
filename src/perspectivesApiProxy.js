@@ -13,7 +13,9 @@ function createRequestEmitterImpl (left, right, emit)
   try
   {
     // Resolve the Perspectives promise made above for the proxy.
-    resolver(new PerspectivesProxy(new InternalChannel(left, right, emit)));
+    const pp = new PerspectivesProxy(new InternalChannel(left, right, emit));
+    resolver(pp);
+    return Perspectives;
   }
   catch(e)
   {

@@ -14,3 +14,24 @@ $ npm install perspectives-proxy
 The purescript module `perspectivesAPI` (part of perspectives-core) uses the exported function `createRequestEmitterImpl` to set up a coroutine `Producer` for requests. This channels requests from a GUI that runs in the same process to the core.
 
 The package perspectives-react uses `createTcpConnectionToPerspectives` to setup a TCP channel to communicate with a perspectives-core that runs in its own process.
+
+## Build
+Create `dist/perspectives-proxy.js` by evaluating on the command line:
+
+```
+$ npm run build
+```
+This is equivalent to:
+```
+$ npx webpack
+```
+## Watch
+Have Webpack watch the sources and update `dist/perspectives-proxy.js` by evaluating on the command line:
+
+```
+$ npm run watch
+```
+This is equivalent to:
+```
+$ npx webpack --watch
+```
