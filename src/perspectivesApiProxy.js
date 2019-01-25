@@ -293,6 +293,76 @@ class PerspectivesProxy
       {request: "GetContextType", subject: contextID, predicate: ""},
       receiveValues);
   }
+
+  getRolType (rolID, receiveValues)
+  {
+    this.send(
+      {request: "GetRolType", subject: rolID, predicate: ""},
+      receiveValues);
+  }
+
+  // Either throws an error, or returns an id.
+  createContext (contextDescription, receiveResponse)
+  {
+    this.send(
+      {request: "CreateContext", contextDescription: contextDescription},
+      function(r)
+      {
+        if ( r.indexOf["ok"] < 0)
+        {
+          throw "Context could not be created: " + r
+        }
+        else
+        {
+          receiveResponse( r[1] );
+        }
+      },
+      receiveResponse
+    )
+  }
+
+  setProperty (rolID, propertyName, value)
+  {
+    this.send(
+      {request: "SetProperty", subject: rolID, predicate: propertyName, object: value},
+      function(r)
+      {
+        if ( r.indexOf["ok"] < 0)
+        {
+          throw "Property could not be set: " + r
+        }
+      }
+    )
+  }
+
+  setBinding (rolID, bindingID)
+  {
+    this.send(
+      {request: "SetBinding", subject: rolID, object: bindingID},
+      function(r)
+      {
+        if ( r.indexOf["ok"] < 0)
+        {
+          throw "Binding could not be created: " + r
+        }
+      }
+    );
+  }
+
+  createRol (contextinstance, rolType, rolDescription)
+  {
+    this.send(
+      {request: "CreateRol", subject: contextinstance, predicate: rolType, rolDescription: rolDescription },
+      function(r)
+      {
+        if ( r.indexOf["ok"] < 0)
+        {
+          throw "Binding could not be created: " + r
+        }
+      }
+    );
+  }
+
 }
 
 module.exports = {
