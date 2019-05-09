@@ -8,12 +8,12 @@ const Perspectives = new Promise(
   });
 
 // This function will be called from Perspectives Core if it want to set up an internal channel to a GUI.
-function createRequestEmitterImpl (left, right, emit)
+function createRequestEmitterImpl (emitStep, finishStep, emit)
 {
   try
   {
     // Resolve the Perspectives promise made above for the proxy.
-    const pp = new PerspectivesProxy(new InternalChannel(left, right, emit));
+    const pp = new PerspectivesProxy(new InternalChannel(emitStep, finishStep, emit));
     resolver(pp);
     return Perspectives;
   }
@@ -161,10 +161,10 @@ class TcpChannel
 
 class InternalChannel
 {
-  constructor (left, right, emit)
+  constructor (emitStep, finishStep, emit)
   {
-    this.left = left;
-    this.right = right;
+    this.emitStep = emitStep;
+    this.finishStep = finishStep;
     this.emit = emit;
     this.requestId = -1;
   }
@@ -179,7 +179,7 @@ class InternalChannel
   // No other requests may follow this message.
   close()
   {
-    this.emit( this.right({}) )();
+    this.emit( this.finishStep({}) )();
     this.emit = function()
     {
       throw( "This client has shut down!");
@@ -197,7 +197,7 @@ class InternalChannel
       return function () {};
     };
     req.setterId = this.nextRequestId();
-    this.emit( this.left(req) )();
+    this.emit( this.emitStep(req) )();
     // return the unsubscriber.
     return function()
     {
@@ -316,8 +316,7 @@ class PerspectivesProxy
         {
           receiveResponse( r[1] );
         }
-      },
-      receiveResponse
+      }
     )
   }
 
@@ -349,7 +348,7 @@ class PerspectivesProxy
     );
   }
 
-  createRol (contextinstance, rolType, rolDescription)
+  createRol (contextinstance, rolType, rolDescription, receiveResponse)
   {
     this.send(
       {request: "CreateRol", subject: contextinstance, predicate: rolType, rolDescription: rolDescription },
@@ -359,6 +358,7 @@ class PerspectivesProxy
         {
           throw "Binding could not be created: " + r
         }
+        receiveResponse(r[1]);
       }
     );
   }
