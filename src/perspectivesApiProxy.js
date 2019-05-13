@@ -63,14 +63,14 @@ class TcpChannel
       function (message)
       {
         const messages = (message + "").split("\n");
-        messages.forEach( function(m)
+        messages.forEach( function(m) // m :: PerspectivesApiTypes.ResponseRecord
         {
           if (m !== "")
           {
             try
             {
-              const {setterId, objects} = JSON.parse(m);
-              valueReceivers[setterId](objects);
+              const responseRecord = JSON.parse(m);
+              valueReceivers[responseRecord.corrId](responseRecord);
             }
             catch(e)
             {
@@ -145,7 +145,7 @@ class TcpChannel
   // type ReactStateSetterIdentifier = String
   send(req, receiveValues)
   {
-    req.setterId = this.nextRequestId();
+    req.corrId = this.nextRequestId();
     this.valueReceivers[ req.setterId ] = receiveValues;
     this.connection.write(JSON.stringify(req) + "\n");
   }
@@ -186,19 +186,13 @@ class InternalChannel
     };
   }
 
-  send (req, receiveValues)
+  send ( req )
   {
     const proxy = this;
-    // Create a correlation identifier and store 'receiveValues' with it.
-    // Send the correlation identifier instead of reactStateSetter.
-    req.reactStateSetter = function (arrString)
-    {
-      receiveValues(arrString);
-      return function () {};
-    };
-    req.setterId = this.nextRequestId();
+    // Create a correlation identifier and store it in the request.
+    req.corrId = this.nextRequestId();
     this.emit( this.emitStep(req) )();
-    // return the unsubscriber.
+    // return the unsubscriber. TODO: is dit nog actueel?
     return function()
     {
       proxy.unsubscribe( req );
@@ -230,7 +224,33 @@ class PerspectivesProxy
 
   send (req, receiveValues)
   {
-    this.channel.send( req, receiveValues );
+    const defaultRequest =
+      {
+        request: "WrongRequest",
+        subject: "The original request did not have a request type!",
+        predicate: "",
+        object: "",
+        reactStateSetter: handleErrors,
+        corrId: "",
+        contextDescription: {}
+      };
+    // Handle errors here. TODO: pas aan op nieuw response format.
+    const handleErrors = function(response) // response = PerspectivesApiTypes.ResponseRecord
+    {
+      if (response.error)
+      {
+        throw response.error;
+      }
+      else {
+        receiveValues(response.result);
+      }
+      // This is the Effect.
+      return function () {};
+    }
+    req.reactStateSetter = handleErrors;
+    // Move all properties to the default request to ensure we send a complete request.
+    Object.assign(defaultRequest,req)
+    this.channel.send( defaultRequest );
   }
 
   unsubscribe (req)
