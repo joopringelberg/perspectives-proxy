@@ -328,14 +328,7 @@ class PerspectivesProxy
       {request: "CreateContext", contextDescription: contextDescription},
       function(r)
       {
-        if ( r.indexOf["ok"] < 0)
-        {
-          throw "Context could not be created: " + r
-        }
-        else
-        {
-          receiveResponse( r[1] );
-        }
+        receiveResponse( r );
       }
     )
   }
@@ -378,7 +371,7 @@ class PerspectivesProxy
         {
           throw "Binding could not be created: " + r
         }
-        receiveResponse(r[1]);
+        receiveResponse(r);
       }
     );
   }
