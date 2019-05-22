@@ -333,6 +333,18 @@ class PerspectivesProxy
     )
   }
 
+  // Either throws an error, or returns an id.
+  deleteContext (id, receiveResponse)
+  {
+    this.send(
+      {request: "DeleteContext", subject: id},
+      function(r)
+      {
+        receiveResponse( r );
+      }
+    )
+  }
+
   setProperty (rolID, propertyName, value)
   {
     this.send(
