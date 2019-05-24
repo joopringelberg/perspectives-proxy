@@ -143,11 +143,14 @@ class TcpChannel
   //   , predicate :: String
   //   , setterId :: ReactStateSetterIdentifier}
   // type ReactStateSetterIdentifier = String
+  // Returns a structure that can be used by the caller to unsubscribe from the core dependency network.
   send(req, receiveValues)
   {
     req.corrId = this.nextRequestId();
     this.valueReceivers[ req.setterId ] = receiveValues;
     this.connection.write(JSON.stringify(req) + "\n");
+    // return the elementary data for unsubscribing.
+    return {subject: req.subject, predicate: req.corrId};
   }
 
   unsubscribe(req)
@@ -186,17 +189,15 @@ class InternalChannel
     };
   }
 
+  // Returns a structure that can be used by the caller to unsubscribe from the core dependency network.
   send ( req )
   {
     const proxy = this;
     // Create a correlation identifier and store it in the request.
     req.corrId = this.nextRequestId();
     this.emit( this.emitStep(req) )();
-    // return the unsubscriber. TODO: is dit nog actueel?
-    return function()
-    {
-      proxy.unsubscribe( req );
-    };
+    // return the elementary data for unsubscribing.
+    return {subject: req.subject, predicate: req.corrId + ""};
   }
 
   unsubscribe(req)
@@ -222,6 +223,7 @@ class PerspectivesProxy
     this.channel.close();
   }
 
+  // Returns a structure that can be used by the caller to unsubscribe from the core dependency network.
   send (req, receiveValues)
   {
     const defaultRequest =
@@ -250,9 +252,10 @@ class PerspectivesProxy
     req.reactStateSetter = handleErrors;
     // Move all properties to the default request to ensure we send a complete request.
     Object.assign(defaultRequest,req)
-    this.channel.send( defaultRequest );
+    return this.channel.send( defaultRequest );
   }
 
+  // unsubscribe from the channel.
   unsubscribe (req)
   {
     this.channel.unsubscribe(req);
@@ -260,63 +263,63 @@ class PerspectivesProxy
 
   getRolBinding (contextID, rolName, receiveValues)
   {
-    this.send(
+    return this.send(
       {request: "GetRolBinding", subject: contextID, predicate: rolName},
       receiveValues);
   }
 
   getRol (contextID, rolName, receiveValues)
   {
-    this.send(
+    return this.send(
       {request: "GetRol", subject: contextID, predicate: rolName},
       receiveValues);
   }
 
   getProperty (rolID, propertyName, receiveValues)
   {
-    this.send(
+    return this.send(
       {request: "GetProperty", subject: rolID, predicate: propertyName},
       receiveValues);
   }
 
   getBinding (rolID, receiveValues)
   {
-    this.send(
+    return this.send(
       {request: "GetBinding", subject: rolID, predicate: ""},
       receiveValues);
   }
 
   getBindingType (rolID, receiveValues)
   {
-    this.send(
+    return this.send(
       {request: "GetBindingType", subject: rolID, predicate: ""},
       receiveValues);
   }
 
   getViewProperties (viewName, receiveValues)
   {
-    this.send(
+    return this.send(
       {request: "GetViewProperties", subject: viewName, predicate: ""},
       receiveValues);
   }
 
   getRolContext (rolID, receiveValues)
   {
-    this.send(
+    return this.send(
       {request: "GetRolContext", subject: rolID, predicate: ""},
       receiveValues);
   }
 
   getContextType (contextID, receiveValues)
   {
-    this.send(
+    return this.send(
       {request: "GetContextType", subject: contextID, predicate: ""},
       receiveValues);
   }
 
   getRolType (rolID, receiveValues)
   {
-    this.send(
+    return this.send(
       {request: "GetRolType", subject: rolID, predicate: ""},
       receiveValues);
   }
