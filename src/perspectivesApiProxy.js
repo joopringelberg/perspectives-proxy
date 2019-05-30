@@ -275,6 +275,13 @@ class PerspectivesProxy
       receiveValues);
   }
 
+  getUnqualifiedRol (contextID, localRolName, receiveValues)
+  {
+    return this.send(
+      {request: "GetUnqualifiedRol", subject: contextID, predicate: localRolName},
+      receiveValues);
+  }
+
   getProperty (rolID, propertyName, receiveValues)
   {
     return this.send(
@@ -296,10 +303,10 @@ class PerspectivesProxy
       receiveValues);
   }
 
-  getViewProperties (viewName, receiveValues)
+  getViewProperties (rolType, viewName, receiveValues)
   {
     return this.send(
-      {request: "GetViewProperties", subject: viewName, predicate: ""},
+      {request: "GetViewProperties", subject: rolType, predicate: viewName},
       receiveValues);
   }
 
