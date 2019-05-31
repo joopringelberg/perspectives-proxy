@@ -391,12 +391,28 @@ class PerspectivesProxy
       {
         if ( r.indexOf["ok"] < 0)
         {
-          throw "Binding could not be created: " + r
+          throw "CreateRol fails: " + r
         }
         receiveResponse(r);
       }
     );
   }
+
+  createRolWithLocalName (contextinstance, localRolName, contextType, rolDescription, receiveResponse)
+  {
+    this.send(
+      {request: "CreateRolWithLocalName", subject: contextinstance, predicate: localRolName, object: contextType, rolDescription: rolDescription },
+      function(r)
+      {
+        if ( r.indexOf["ok"] < 0)
+        {
+          throw "CreateRolWithLocalName fails: " + r
+        }
+        receiveResponse(r);
+      }
+    );
+  }
+
 
 }
 
