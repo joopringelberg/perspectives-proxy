@@ -194,10 +194,13 @@ class InternalChannel
   {
     const proxy = this;
     // Create a correlation identifier and store it in the request.
-    req.corrId = this.nextRequestId();
+    if ( !req.corrId )
+    {
+      req.corrId = this.nextRequestId();
+    }
     this.emit( this.emitStep(req) )();
     // return the elementary data for unsubscribing.
-    return {subject: req.subject, predicate: req.corrId + ""};
+    return {subject: req.subject, corrId: req.corrId};
   }
 
   unsubscribe(req)
@@ -331,6 +334,13 @@ class PerspectivesProxy
       receiveValues);
   }
 
+  getUnqualifiedRolType (contextType, localRolName, receiveValues)
+  {
+    return this.send(
+      {request: "GetUnqualifiedRolType", subject: contextType, predicate: localRolName},
+      receiveValues);
+  }
+
   // Either throws an error, or returns an id.
   createContext (contextDescription, receiveResponse)
   {
@@ -378,6 +388,20 @@ class PerspectivesProxy
         if ( r.indexOf["ok"] < 0)
         {
           throw "Binding could not be created: " + r
+        }
+      }
+    );
+  }
+
+  bindInNewRol (contextID, rolType, rolInstance )
+  {
+    this.send(
+      {request: "BindInNewRol", subject: contextID, predicate: rolType, object: rolInstance},
+      function(r)
+      {
+        if ( r.indexOf["ok"] < 0)
+        {
+          throw "Binding could not be created in new rol: " + r
         }
       }
     );
