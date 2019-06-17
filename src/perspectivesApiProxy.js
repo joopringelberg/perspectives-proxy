@@ -393,6 +393,34 @@ class PerspectivesProxy
     );
   }
 
+  removeBinding (rolID, bindingID)
+  {
+    this.send(
+      {request: "RemoveBinding", subject: rolID},
+      function(r)
+      {
+        if ( r.indexOf["ok"] < 0)
+        {
+          throw "Binding could not be removed: " + r
+        }
+      }
+    );
+  }
+
+  removeRol (contextID, rolName, rolID)
+  {
+    this.send(
+      {request: "RemoveRol", subject: contextID, predicate: rolName, object: rolID},
+      function(r)
+      {
+        if ( r.indexOf["ok"] < 0)
+        {
+          throw "Rol could not be removed: " + r
+        }
+      }
+    );
+  }
+
   bindInNewRol (contextID, rolType, rolInstance )
   {
     this.send(
