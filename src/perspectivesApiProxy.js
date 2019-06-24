@@ -435,6 +435,15 @@ class PerspectivesProxy
     );
   }
 
+  // checkBinding( <contexttype>, <localRolName>, <type-of-rol-to-bind>, [() -> undefined] )
+  checkBinding (contextType, localRolName, rolInstance, callback)
+  {
+    this.send(
+      {request: "CheckBinding", subject: contextType, predicate: localRolName, object: rolInstance}
+      , callback
+    );
+  }
+
   createRol (contextinstance, rolType, rolDescription, receiveResponse)
   {
     this.send(
