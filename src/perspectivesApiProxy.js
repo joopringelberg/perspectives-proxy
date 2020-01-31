@@ -341,6 +341,15 @@ class PerspectivesProxy
       receiveValues);
   }
 
+  // Returns an array of Role Types.
+  getMeForContext (externalRoleInstance, receiveValues)
+  {
+    return this.send(
+      {request: "GetMeForContext", subject: externalRoleInstance},
+      receiveValues
+    )
+  }
+
   // Either throws an error, or returns an id.
   createContext (contextDescription, receiveResponse)
   {
@@ -420,6 +429,8 @@ class PerspectivesProxy
       }
     );
   }
+
+  // TODO: deleteRol
 
   bindInNewRol (contextID, rolType, rolInstance )
   {
