@@ -8,6 +8,7 @@ const Perspectives = new Promise(
   });
 
 // This function will be called from Perspectives Core if it want to set up an internal channel to a GUI.
+// emitStep will be bound to the constructor Emit, finishStep will be the constructor Finish.
 function createRequestEmitterImpl (emitStep, finishStep, emit)
 {
   try
@@ -164,6 +165,8 @@ class TcpChannel
 
 class InternalChannel
 {
+  // emitStep will be bound to the constructor Emit, finishStep will be the constructor Finish.
+  // emit must be bound to an Effect producing function.
   constructor (emitStep, finishStep, emit)
   {
     this.emitStep = emitStep;
@@ -346,6 +349,14 @@ class PerspectivesProxy
   {
     return this.send(
       {request: "GetMeForContext", subject: externalRoleInstance},
+      receiveValues
+    )
+  }
+
+  getUserIdentifier (receiveValues)
+  {
+    return this.send(
+      {request: "GetUserIdentifier"},
       receiveValues
     )
   }
