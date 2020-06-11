@@ -1,5 +1,10 @@
 let resolver, rejecter;
 
+// This promise will resolve to an instance of PerspectivesProxy, with an InternalChannel.
+// The proxy uses the channel to actually send requests to the core. These requests will
+// turn up as 'output' of a Producer, ready to be consumed by some process.
+// The channel uses the emit function as a callback: when it has a request to send, it calls 'emit'
+// after wrapping the request in the appropriate constructor (usually the emitStep).
 const Perspectives = new Promise(
   function (resolve, reject)
   {
@@ -16,7 +21,6 @@ function createRequestEmitterImpl (emitStep, finishStep, emit)
     // Resolve the Perspectives promise made above for the proxy.
     const pp = new PerspectivesProxy(new InternalChannel(emitStep, finishStep, emit));
     resolver(pp);
-    return Perspectives;
   }
   catch(e)
   {
@@ -361,11 +365,23 @@ class PerspectivesProxy
     )
   }
 
-  // Either throws an error, or returns an id.
+  // Either throws an error, or returns an array with a context identifier.
   createContext (contextDescription, receiveResponse)
   {
     this.send(
       {request: "CreateContext", contextDescription: contextDescription},
+      function(r)
+      {
+        receiveResponse( r );
+      }
+    )
+  }
+
+  // Either throws an error, or returns an array of context identifiers.
+  importContexts (contextDescription, receiveResponse)
+  {
+    this.send(
+      {request: "ImportContexts", contextDescription: contextDescription},
       function(r)
       {
         receiveResponse( r );
