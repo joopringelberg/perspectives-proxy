@@ -292,10 +292,10 @@ class PerspectivesProxy
       receiveValues);
   }
 
-  getProperty (rolID, propertyName, receiveValues)
+  getProperty (rolID, propertyName, roleType, receiveValues)
   {
     return this.send(
-      {request: "GetProperty", subject: rolID, predicate: propertyName},
+      {request: "GetProperty", subject: rolID, predicate: propertyName, object: roleType},
       receiveValues);
   }
 
