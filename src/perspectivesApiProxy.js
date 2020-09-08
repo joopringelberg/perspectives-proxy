@@ -366,10 +366,10 @@ class PerspectivesProxy
   }
 
   // Either throws an error, or returns an array with a context identifier.
-  createContext (contextDescription, receiveResponse)
+  createContext (contextDescription, myroletype, receiveResponse)
   {
     this.send(
-      {request: "CreateContext", contextDescription: contextDescription},
+      {request: "CreateContext", contextDescription: contextDescription, authoringRole: myroletype},
       function(r)
       {
         receiveResponse( r );
@@ -389,11 +389,12 @@ class PerspectivesProxy
     )
   }
 
-  // Either throws an error, or returns an id.
-  deleteContext (id, receiveResponse)
+  // Either throws an error, or returns an empty array.
+  // Notice we re-use the contextDescription field.
+  importTransaction (transaction, receiveResponse)
   {
     this.send(
-      {request: "DeleteContext", subject: id},
+      {request: "ImportTransaction", contextDescription: transaction},
       function(r)
       {
         receiveResponse( r );
@@ -401,10 +402,22 @@ class PerspectivesProxy
     )
   }
 
-  setProperty (rolID, propertyName, value)
+  // Either throws an error, or returns an id.
+  deleteContext (id, myroletype, receiveResponse)
   {
     this.send(
-      {request: "SetProperty", subject: rolID, predicate: propertyName, object: value},
+      {request: "DeleteContext", subject: id, authoringRole: myroletype},
+      function(r)
+      {
+        receiveResponse( r );
+      }
+    )
+  }
+
+  setProperty (rolID, propertyName, value, myroletype)
+  {
+    this.send(
+      {request: "SetProperty", subject: rolID, predicate: propertyName, object: value, authoringRole: myroletype},
       function(r)
       {
         if ( r.indexOf["ok"] < 0)
@@ -415,10 +428,10 @@ class PerspectivesProxy
     )
   }
 
-  setBinding (rolID, bindingID)
+  setBinding (rolID, bindingID, myroletype)
   {
     this.send(
-      {request: "SetBinding", subject: rolID, object: bindingID},
+      {request: "SetBinding", subject: rolID, object: bindingID, authoringRole: myroletype},
       function(r)
       {
         if ( r.indexOf["ok"] < 0)
@@ -429,10 +442,10 @@ class PerspectivesProxy
     );
   }
 
-  removeBinding (rolID, bindingID)
+  removeBinding (rolID, bindingID, myroletype)
   {
     this.send(
-      {request: "RemoveBinding", subject: rolID},
+      {request: "RemoveBinding", subject: rolID, authoringRole: myroletype},
       function(r)
       {
         if ( r.indexOf["ok"] < 0)
@@ -443,10 +456,10 @@ class PerspectivesProxy
     );
   }
 
-  removeRol (contextID, rolName, rolID)
+  removeRol (contextID, rolName, rolID, myroletype)
   {
     this.send(
-      {request: "RemoveRol", subject: contextID, predicate: rolName, object: rolID},
+      {request: "RemoveRol", subject: contextID, predicate: rolName, object: rolID, authoringRole: myroletype},
       function(r)
       {
         if ( r.indexOf["ok"] < 0)
@@ -459,10 +472,10 @@ class PerspectivesProxy
 
   // TODO: deleteRol
 
-  bindInNewRol (contextID, rolType, rolInstance )
+  bindInNewRol (contextID, rolType, rolInstance, myroletype )
   {
     this.send(
-      {request: "BindInNewRol", subject: contextID, predicate: rolType, object: rolInstance},
+      {request: "BindInNewRol", subject: contextID, predicate: rolType, object: rolInstance, authoringRole: myroletype},
       function(r)
       {
         if ( r.indexOf["ok"] < 0)
@@ -482,10 +495,10 @@ class PerspectivesProxy
     );
   }
 
-  createRol (contextinstance, rolType, rolDescription, receiveResponse)
+  createRol (contextinstance, rolType, rolDescription, myroletype, receiveResponse)
   {
     this.send(
-      {request: "CreateRol", subject: contextinstance, predicate: rolType, rolDescription: rolDescription },
+      {request: "CreateRol", subject: contextinstance, predicate: rolType, rolDescription: rolDescription, authoringRole: myroletype },
       function(r)
       {
         if ( r.indexOf["ok"] < 0)
@@ -497,10 +510,10 @@ class PerspectivesProxy
     );
   }
 
-  createRolWithLocalName (contextinstance, localRolName, contextType, rolDescription, receiveResponse)
+  createRolWithLocalName (contextinstance, localRolName, contextType, rolDescription, myroletype, receiveResponse)
   {
     this.send(
-      {request: "CreateRolWithLocalName", subject: contextinstance, predicate: localRolName, object: contextType, rolDescription: rolDescription },
+      {request: "CreateRolWithLocalName", subject: contextinstance, predicate: localRolName, object: contextType, rolDescription: rolDescription, authoringRole: myroletype },
       function(r)
       {
         if ( r.indexOf["ok"] < 0)
