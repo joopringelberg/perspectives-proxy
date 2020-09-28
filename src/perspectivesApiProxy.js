@@ -313,6 +313,20 @@ class PerspectivesProxy
       receiveValues);
   }
 
+  getRoleBinders (rolID, roleType, receiveValues)
+  {
+    return this.send(
+      {request: "GetRoleBinders", subject: rolID, predicate: roleType},
+      receiveValues);
+  }
+
+  getUnqualifiedRoleBinders (rolID, localRolName, receiveValues)
+  {
+    return this.send(
+      {request: "GetUnqualifiedRoleBinders", subject: rolID, predicate: localRolName},
+      receiveValues);
+  }
+
   getViewProperties (rolType, viewName, receiveValues)
   {
     return this.send(
@@ -365,11 +379,27 @@ class PerspectivesProxy
     )
   }
 
+  // Create a context, bound to a new instance of <roleType> in <contextId>. <roleType> may be a local name.
+  // createContext( <contextDescription>, <roleType>, <contextId>, <EmbeddingContextType>, ...)
   // Either throws an error, or returns an array with a context identifier.
-  createContext (contextDescription, myroletype, receiveResponse)
+  createContext (contextDescription, roleType, contextId, embeddingContextType, myroletype, receiveResponse)
   {
     this.send(
-      {request: "CreateContext", contextDescription: contextDescription, authoringRole: myroletype},
+      {request: "CreateContext", subject: contextId, predicate: roleType, object: embeddingContextType, contextDescription: contextDescription, authoringRole: myroletype},
+      function(r)
+      {
+        receiveResponse( r );
+      }
+    )
+  }
+
+  // Create a context, bound to the given role instance.
+  // createContext_( <contextDescription>, <roleinstance>, ...)
+  // Either throws an error, or returns an array with a context identifier.
+  createContext_ (contextDescription, roleInstance, myroletype, receiveResponse)
+  {
+    this.send(
+      {request: "CreateContext_", subject: roleInstance, contextDescription: contextDescription, authoringRole: myroletype},
       function(r)
       {
         receiveResponse( r );
@@ -402,18 +432,6 @@ class PerspectivesProxy
     )
   }
 
-  // Either throws an error, or returns an id.
-  deleteContext (id, myroletype, receiveResponse)
-  {
-    this.send(
-      {request: "DeleteContext", subject: id, authoringRole: myroletype},
-      function(r)
-      {
-        receiveResponse( r );
-      }
-    )
-  }
-
   setProperty (rolID, propertyName, value, myroletype)
   {
     this.send(
@@ -426,20 +444,6 @@ class PerspectivesProxy
         }
       }
     )
-  }
-
-  setBinding (rolID, bindingID, myroletype)
-  {
-    this.send(
-      {request: "SetBinding", subject: rolID, object: bindingID, authoringRole: myroletype},
-      function(r)
-      {
-        if ( r.indexOf["ok"] < 0)
-        {
-          throw "Binding could not be created: " + r
-        }
-      }
-    );
   }
 
   removeBinding (rolID, bindingID, myroletype)
@@ -456,10 +460,10 @@ class PerspectivesProxy
     );
   }
 
-  removeRol (contextID, rolName, rolID, myroletype)
+  removeRol (contextType, rolName, rolID, myroletype)
   {
     this.send(
-      {request: "RemoveRol", subject: contextID, predicate: rolName, object: rolID, authoringRole: myroletype},
+      {request: "RemoveRol", subject: rolID, predicate: rolName, object: contextType, authoringRole: myroletype},
       function(r)
       {
         if ( r.indexOf["ok"] < 0)
@@ -470,12 +474,40 @@ class PerspectivesProxy
     );
   }
 
-  // TODO: deleteRol
-
-  bindInNewRol (contextID, rolType, rolInstance, myroletype )
+  deleteRole (contextID, rolName, rolID, myroletype)
   {
     this.send(
-      {request: "BindInNewRol", subject: contextID, predicate: rolType, object: rolInstance, authoringRole: myroletype},
+      {request: "DeleteRole", subject: rolName, predicate: contextID, authoringRole: myroletype},
+      function(r)
+      {
+        if ( r.indexOf["ok"] < 0)
+        {
+          throw "Rol could not be deleted: " + r
+        }
+      }
+    );
+  }
+
+
+  bind (contextinstance, localRolName, contextType, rolDescription, myroletype, receiveResponse)
+  {
+    this.send(
+      {request: "Bind", subject: contextinstance, predicate: localRolName, object: contextType, rolDescription: rolDescription, authoringRole: myroletype },
+      function(r)
+      {
+        if ( r.indexOf["ok"] < 0)
+        {
+          throw "Bind_WithLocalName fails: " + r
+        }
+        receiveResponse(r);
+      }
+    );
+  }
+
+  bind_ (binder, binding, myroletype)
+  {
+    this.send(
+      {request: "Bind_", subject: binder, object: binding, authoringRole: myroletype},
       function(r)
       {
         if ( r.indexOf["ok"] < 0)
@@ -486,7 +518,7 @@ class PerspectivesProxy
     );
   }
 
-  // checkBinding( <contexttype>, <localRolName>, <type-of-rol-to-bind>, [() -> undefined] )
+  // checkBinding( <contexttype>, <localRolName>, <binding>, [() -> undefined] )
   checkBinding (contextType, localRolName, rolInstance, callback)
   {
     this.send(
@@ -495,7 +527,10 @@ class PerspectivesProxy
     );
   }
 
-  createRol (contextinstance, rolType, rolDescription, myroletype, receiveResponse)
+  // We have room for checkBinding_( <binder>, <binding>, [() -> undefined] )
+
+  // TODO: maak hier createRole van.
+  createRol (contextinstance, rolType, myroletype, receiveResponse)
   {
     this.send(
       {request: "CreateRol", subject: contextinstance, predicate: rolType, rolDescription: rolDescription, authoringRole: myroletype },
@@ -509,22 +544,6 @@ class PerspectivesProxy
       }
     );
   }
-
-  createRolWithLocalName (contextinstance, localRolName, contextType, rolDescription, myroletype, receiveResponse)
-  {
-    this.send(
-      {request: "CreateRolWithLocalName", subject: contextinstance, predicate: localRolName, object: contextType, rolDescription: rolDescription, authoringRole: myroletype },
-      function(r)
-      {
-        if ( r.indexOf["ok"] < 0)
-        {
-          throw "CreateRolWithLocalName fails: " + r
-        }
-        receiveResponse(r);
-      }
-    );
-  }
-
 
 }
 
