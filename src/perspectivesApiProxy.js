@@ -205,6 +205,7 @@ class InternalChannel
     {
       req.corrId = this.nextRequestId();
     }
+    // console.log( req );
     this.emit( this.emitStep(req) )();
     // return the elementary data for unsubscribing.
     return {subject: req.subject, corrId: req.corrId};
@@ -234,7 +235,7 @@ class PerspectivesProxy
   }
 
   // Returns a structure that can be used by the caller to unsubscribe from the core dependency network.
-  send (req, receiveValues)
+  send (req, receiveValues, errorHandler)
   {
     const defaultRequest =
       {
@@ -246,12 +247,21 @@ class PerspectivesProxy
         corrId: "",
         contextDescription: {}
       };
-    // Handle errors here. TODO: pas aan op nieuw response format.
+
+    // Handle errors here. Use `errorHandler` if provided by the PerspectivesProxy method, otherwise
+    // just log a warning on the console.
     const handleErrors = function(response) // response = PerspectivesApiTypes.ResponseRecord
     {
       if (response.error)
       {
-        throw response.error;
+        if (errorHandler)
+        {
+          errorHandler( response.error );
+        }
+        else
+        {
+          console.warn( defaultRequest.request + ": " + response.error );
+        }
       }
       else {
         receiveValues(response.result);
@@ -432,31 +442,28 @@ class PerspectivesProxy
     )
   }
 
+  // value is just a single string!
   setProperty (rolID, propertyName, value, myroletype)
   {
     this.send(
       {request: "SetProperty", subject: rolID, predicate: propertyName, object: value, authoringRole: myroletype},
-      function(r)
-      {
-        if ( r.indexOf["ok"] < 0)
-        {
-          throw "Property could not be set: " + r
-        }
-      }
+      function(r) {}
     )
+  }
+
+  deleteProperty (rolID, propertyName, myroletype)
+  {
+    this.send(
+      {request: "DeleteProperty", subject: rolID, predicate: propertyName, authoringRole: myroletype},
+      function(r) {}
+    );
   }
 
   removeBinding (rolID, bindingID, myroletype)
   {
     this.send(
       {request: "RemoveBinding", subject: rolID, authoringRole: myroletype},
-      function(r)
-      {
-        if ( r.indexOf["ok"] < 0)
-        {
-          throw "Binding could not be removed: " + r
-        }
-      }
+      function(r) {}
     );
   }
 
@@ -464,13 +471,7 @@ class PerspectivesProxy
   {
     this.send(
       {request: "RemoveRol", subject: rolID, predicate: rolName, object: contextType, authoringRole: myroletype},
-      function(r)
-      {
-        if ( r.indexOf["ok"] < 0)
-        {
-          throw "Rol could not be removed: " + r
-        }
-      }
+      function(r) {}
     );
   }
 
@@ -478,13 +479,7 @@ class PerspectivesProxy
   {
     this.send(
       {request: "DeleteRole", subject: rolName, predicate: contextID, authoringRole: myroletype},
-      function(r)
-      {
-        if ( r.indexOf["ok"] < 0)
-        {
-          throw "Rol could not be deleted: " + r
-        }
-      }
+      function(r) {}
     );
   }
 
@@ -493,14 +488,7 @@ class PerspectivesProxy
   {
     this.send(
       {request: "Bind", subject: contextinstance, predicate: localRolName, object: contextType, rolDescription: rolDescription, authoringRole: myroletype },
-      function(r)
-      {
-        if ( r.indexOf["ok"] < 0)
-        {
-          throw "Bind_WithLocalName fails: " + r
-        }
-        receiveResponse(r);
-      }
+      function(r) {}
     );
   }
 
@@ -508,13 +496,7 @@ class PerspectivesProxy
   {
     this.send(
       {request: "Bind_", subject: binder, object: binding, authoringRole: myroletype},
-      function(r)
-      {
-        if ( r.indexOf["ok"] < 0)
-        {
-          throw "Binding could not be created in new rol: " + r
-        }
-      }
+      function(r) {}
     );
   }
 
@@ -529,19 +511,11 @@ class PerspectivesProxy
 
   // We have room for checkBinding_( <binder>, <binding>, [() -> undefined] )
 
-  // TODO: maak hier createRole van.
-  createRol (contextinstance, rolType, myroletype, receiveResponse)
+  createRole (contextinstance, rolType, myroletype, receiveResponse)
   {
     this.send(
-      {request: "CreateRol", subject: contextinstance, predicate: rolType, rolDescription: rolDescription, authoringRole: myroletype },
-      function(r)
-      {
-        if ( r.indexOf["ok"] < 0)
-        {
-          throw "CreateRol fails: " + r
-        }
-        receiveResponse(r);
-      }
+      {request: "CreateRol", subject: contextinstance, predicate: rolType, authoringRole: myroletype },
+      function(r) {}
     );
   }
 
