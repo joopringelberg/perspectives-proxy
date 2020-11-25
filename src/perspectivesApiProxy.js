@@ -365,6 +365,13 @@ class PerspectivesProxy
       receiveValues);
   }
 
+  getRoleKind (rolID, receiveValues)
+  {
+    return this.send(
+      {request: "GetRoleKind", subject: rolID, predicate: ""},
+      receiveValues);
+  }
+
   getUnqualifiedRolType (contextType, localRolName, receiveValues)
   {
     return this.send(
@@ -391,7 +398,9 @@ class PerspectivesProxy
 
   // Create a context, bound to a new instance of <roleType> in <contextId>. <roleType> may be a local name.
   // createContext( <contextDescription>, <roleType>, <contextId>, <EmbeddingContextType>, ...)
-  // Either throws an error, or returns an array with a context identifier.
+  // Either throws an error, or returns an array with
+  //  - just a single string identifiying the external role of a DBQ role;
+  //  - that string and a second that identifies the new context role otherwise.
   createContext (contextDescription, roleType, contextId, embeddingContextType, myroletype, receiveResponse)
   {
     this.send(
