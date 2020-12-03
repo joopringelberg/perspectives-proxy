@@ -396,6 +396,16 @@ class PerspectivesProxy
     )
   }
 
+  getLocalRoleSpecialisation( localAspectName, contextInstance, receiveValues )
+  {
+    return this.send(
+      { request: "GetLocalRoleSpecialisation"
+      , subject: contextInstance
+      , predicate: localAspectName},
+      receiveValues
+    );
+  }
+
   // Create a context, bound to a new instance of <roleType> in <contextId>. <roleType> may be a local name.
   // createContext( <contextDescription>, <roleType>, <contextId>, <EmbeddingContextType>, ...)
   // Either throws an error, or returns an array with
