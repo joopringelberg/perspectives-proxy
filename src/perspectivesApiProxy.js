@@ -411,6 +411,7 @@ class PerspectivesProxy
   // Either throws an error, or returns an array with
   //  - just a single string identifiying the external role of a DBQ role;
   //  - that string and a second that identifies the new context role otherwise.
+  // So:  [<externalRoleId>(, <contextRoleId>)?]
   createContext (contextDescription, roleType, contextId, embeddingContextType, myroletype, receiveResponse)
   {
     this.send(
