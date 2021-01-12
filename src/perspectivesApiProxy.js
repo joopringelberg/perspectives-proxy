@@ -1,4 +1,25 @@
-let resolver, rejecter;
+/*
+This module is imported both by the core and by clients and bridges the gap between the two. It supports several architectures:
+  1 with core and client in the same javascript process;
+  2 with core and client in different javascript processes, connected by the Channel Messaging API
+    https://developer.mozilla.org/en-US/docs/Web/API/Channel_Messaging_API
+  3 with core and client in different processes, connected by TCP.
+The core resolves two promises:
+  - one called Perspectives, resolving to an instance of PerspectivesProxy with an InternalChannel, to be used in the first architecture by direct import;
+  - one called InternalChannel, resolving to an instance of InternalChannel, to be used in the second architecture, used by the Service Worker by direct import;
+Then there are two functions to be used by clients, that both resolve the Perspectives promise.
+  - createServiceWorkerConnectionToPerspectives, for the second architecture. It resolves the Perspectives promise with an instance of ServiceWorkerChannel, that *uses* the InternalChannel to communicate with the core;
+  - createTcpConnectionToPerspectives, for the third architecture. It resolves the Perspectives promise with an instance of TcpChannel.
+The Perspectives promise is imported by all of the modules in perspectives-react that must connect to the core.
+*/
+
+////////////////////////////////////////////////////////////////////////////////
+//// CLIENT SIDE PROMISES
+////////////////////////////////////////////////////////////////////////////////
+
+let perspectivesResolver, perspectivesRejecter;
+let internalChannelResolver, internalChannelRejecter;
+let serviceWorkerChannelResolver, serviceWorkerChannelRejecter;
 
 // This promise will resolve to an instance of PerspectivesProxy, with an InternalChannel.
 // The proxy uses the channel to actually send requests to the core. These requests will
@@ -8,9 +29,32 @@ let resolver, rejecter;
 const Perspectives = new Promise(
   function (resolve, reject)
   {
-    resolver = resolve;
-    rejecter = reject;
+    perspectivesResolver = resolve;
+    perspectivesRejecter = reject;
   });
+
+// This promise will resolve to an instance of the InternalChannel.
+// It is used by a ServiceWorker that runs in the same javascript process as the core.
+const InternalChannelPromise = new Promise(
+  function (resolve, reject)
+  {
+    internalChannelResolver = resolve;
+    internalChannelRejecter = reject;
+  });
+
+// This promise will resolve to an instance of the the ServiceWorkerChannel.
+// It is used by InPlace, running in the same javascript process as this proxy.
+const ServiceWorkerChannelPromise = new Promise(
+  function (resolve, reject)
+  {
+    serviceWorkerChannelResolver = resolve;
+    serviceWorkerChannelRejecter = reject;
+  });
+
+
+////////////////////////////////////////////////////////////////////////////////
+//// SERVER SIDE RESOLVER TO INTERNAL CHANNEL AND PERSPECTIVES
+////////////////////////////////////////////////////////////////////////////////
 
 // This function will be called from Perspectives Core if it want to set up an internal channel to a GUI.
 // emitStep will be bound to the constructor Emit, finishStep will be the constructor Finish.
@@ -18,16 +62,22 @@ function createRequestEmitterImpl (emitStep, finishStep, emit)
 {
   try
   {
-    // Resolve the Perspectives promise made above for the proxy.
-    const pp = new PerspectivesProxy(new InternalChannel(emitStep, finishStep, emit));
-    resolver(pp);
+    // Resolve the Perspectives promise and InternalChannelPromise made above for the proxy.
+    const icp = new InternalChannel(emitStep, finishStep, emit)
+    const pp = new PerspectivesProxy(icp);
+    perspectivesResolver(pp);
+    internalChannelResolver (icp);
   }
   catch(e)
   {
-    rejecter(e);
+    perspectivesRejecter(e);
+    internalChannelRejecter(e);
   }
 }
 
+////////////////////////////////////////////////////////////////////////////////
+//// CLIENT SIDE RESOLVER TO TCP CHANNEL
+////////////////////////////////////////////////////////////////////////////////
 // Top level entry function to set up a TCP channel with a Perspectives Core endpoint.
 // From module Control.Aff.Sockets:
 // type TCPOptions opts = {port :: Port, host :: Host, allowHalfOpen :: Boolean | opts}
@@ -38,14 +88,40 @@ function createTcpConnectionToPerspectives (options)
   try
   {
     // Resolve the Perspectives promise made above for the proxy.
-    resolver(new PerspectivesProxy(new TcpChannel(options)));
+    perspectivesResolver(new PerspectivesProxy(new TcpChannel(options)));
   }
   catch (e)
   {
-    rejecter(e);
+    perspectivesRejecter(e);
   }
 }
 
+////////////////////////////////////////////////////////////////////////////////
+//// CLIENT SIDE RESOLVER TO SERVICE WORKER CHANNEL AND SERVICE WORKER CHANNEL PROMISE
+//// This code will be executed by the client!
+////////////////////////////////////////////////////////////////////////////////
+function createServiceWorkerConnectionToPerspectives ()
+{
+  try
+  {
+    // Resolve the Perspectives promise with the InternalChannel created by the core.
+    InternalChannelPromise.then(function(internalChannel)
+     {
+       const serviceWorkerChannel = new ServiceWorkerChannel( internalChannel );
+       serviceWorkerChannelResolver( serviceWorkerChannel );
+       perspectivesResolver( new PerspectivesProxy( serviceWorkerChannel ) );
+     });
+  }
+  catch(e)
+  {
+    serviceWorkerChannelRejecter( e );
+    perspectivesRejecter( e );
+  }
+}
+
+////////////////////////////////////////////////////////////////////////////////
+//// TCP CHANNEL
+////////////////////////////////////////////////////////////////////////////////
 class TcpChannel
 {
   constructor (options)
@@ -152,7 +228,7 @@ class TcpChannel
   send(req, receiveValues)
   {
     req.corrId = this.nextRequestId();
-    this.valueReceivers[ req.setterId ] = receiveValues;
+    this.valueReceivers[ req.corrId ] = receiveValues;
     this.connection.write(JSON.stringify(req) + "\n");
     // return the elementary data for unsubscribing.
     return {subject: req.subject, predicate: req.corrId};
@@ -167,6 +243,9 @@ class TcpChannel
   }
 }
 
+////////////////////////////////////////////////////////////////////////////////
+//// INTERNAL CHANNEL
+////////////////////////////////////////////////////////////////////////////////
 class InternalChannel
 {
   // emitStep will be bound to the constructor Emit, finishStep will be the constructor Finish.
@@ -199,7 +278,6 @@ class InternalChannel
   // Returns a structure that can be used by the caller to unsubscribe from the core dependency network.
   send ( req )
   {
-    const proxy = this;
     // Create a correlation identifier and store it in the request.
     if ( !req.corrId )
     {
@@ -220,6 +298,225 @@ class InternalChannel
 
 }
 
+////////////////////////////////////////////////////////////////////////////////
+//// SERVICE WORKER CHANNEL
+//// This code will be executed by the client!
+//// The ServiceWorkerChannel is a proxy for the ServiceWorker for the client.
+////////////////////////////////////////////////////////////////////////////////
+class ServiceWorkerChannel ()
+{
+  constructor( )
+  {
+    const serviceWorkerChannel = this;
+    this.requestId = -1;
+    this.valueReceivers = {};
+    this.channelId = undefined;
+    this.port = undefined;
+
+    this.handleServiceWorkerResponse = this.handleServiceWorkerResponse.bind(this);
+
+    // Register the service worker.
+    this.serviceWorkerPromise = new Promise(
+      function (resolve, reject)
+      {
+        if ('serviceWorker' in navigator)
+        {
+          navigator.serviceWorker.register(
+            'perspectives-service-worker.js',
+            {
+                scope: './'
+            }).then(function (registration)
+              {
+                var serviceWorker;
+                if (registration.installing) {
+                  serviceWorker = registration.installing;
+                } else if (registration.waiting) {
+                  serviceWorker = registration.waiting;
+                } else if (registration.active) {
+                  serviceWorker = registration.active;
+                }
+                if (serviceWorker)
+                {
+                  resolve( serviceWorker );
+                }
+                else
+                {
+                  reject ("Could not get serviceWorker from registration for an unknown reason.")
+                }
+              }).catch (function (error)
+                {
+                  // Something went wrong during registration. The service-worker.js file
+                  // might be unavailable or contain a syntax error.
+                  reject( error );
+                });
+        }
+        else
+        {
+            reject( "This browser does not support service workers.")
+        }
+      });
+
+    this.serviceWorkerPromise.then(
+      function( serviceWorker )
+      {
+        // Create a Channel. Save the port.
+        var channel = new MessageChannel();
+        serviceWorkerChannel.port = channel.port1;
+
+        // Listen to the port, handle all responses that come from the serviceworker.
+        serviceWorkerChannel.port.onmessage = serviceWorkerChannel.handleServiceWorkerResponse;
+
+        // Transfer one port to the service worker.
+        serviceWorker.postMessage('port', '*', [channel.port2]);
+      }
+    );
+  }
+
+  // The serviceworker sends messages of various types.
+  // Among them are responses received by the core.
+  //
+  handleServiceWorkerResponse (e)
+  {
+    if (e.data.error)
+    {
+      // {corrId: i, error: s} where s is is a String, i an int.
+      // we just pass errors on.
+      valueReceivers[ e.data.corrId ]( e.data );
+    }
+    else if ( e.data.result )
+    {
+      // {corrId: i, result: s} where s is an Array of String, i an int.
+      // pass the result on
+      valueReceivers[ e.data.corrId ]( e.data );
+    }
+    // Then we have a category of incoming messages that originate in the service worker itself,
+    // often in response to a specific request sent by the proxy.
+    else if ( e.data.serviceWorkerMessage )
+    {
+      // {serviceWorkerMessage: m, <field>: <value>} where m is a string. The object may contain any number of other fields, depending on the type of message (i.e. the value of m).
+      switch( e.data.serviceWorkerMessage )
+      {
+        case "channelId":
+          // This actually is a response that is not provoked by explicitly asking for it.
+          // As soon as the ServiceWorker receives a port from this proxy, it will return the channels id.
+          // {serviceWorkerMessage: "channelId", channelId: i} where i is a multiple of a million.
+          // Handle the port identification message that is sent by the service worker.
+          this.channelId = e.data.channelId;
+          break;
+        case "isUserLoggedIn":
+          // {serviceWorkerMessage: "isUserLoggedIn", isUserLoggedIn, b} where b is a boolean.
+          valueReceivers.isUserLoggedIn( e.data.isUserLoggedIn );
+          break;
+        case "authenticate":
+          // {serviceWorkerMessage: "authenticate", authenticationResult, n} where n is an integer.
+          // data AuthenticationResult = UnknownUser | WrongCredentials | OK CouchdbUser
+          // UnknownUser = 0
+          // WrongCredentials = 1
+          // OK CouchdbUser = 2
+          valueReceivers.authenticate( e.data.authenticationResult );
+          break;
+
+        case "resetAccount":
+          // {serviceWorkerMessage: "resetAccount"} where b is a boolean.
+          valueReceivers.resetAccount( true );
+          break;
+      }
+    }
+  }
+
+  // Returns a promise for a boolean value, reflecting whether the end user has logged in before or not.
+  isUserLoggedIn ()
+  {
+    const proxy = this;
+    this.port.postMessage( {proxyRequest: "isUserLoggedIn"} );
+    return new Promise(
+      function(resolver, rejecter)
+      {
+        proxy.valueReceivers.isUserLoggedIn = function(isLoggedIn)
+          {
+            proxy.valueReceivers.isUserLoggedIn = undefined;
+            resolver( isLoggedIn );
+          };
+      }
+    );
+  }
+
+  // Returns a promise for an integer value:
+  // UnknownUser = 0
+  // WrongCredentials = 1
+  // OK CouchdbUser = 2
+  authenticate (username, password, host, port)
+  {
+    const proxy = this;
+    this.port.postMessage( {proxyRequest: "authenticate", username: username, password: password, host: host, port: port} );
+    return new Promise(
+      function(resolver, rejecter)
+      {
+        proxy.valueReceivers.authenticate = function(result)
+          {
+            proxy.valueReceivers.authenticate = undefined;
+            resolver( result );
+          };
+      }
+    );
+  }
+
+  resetAccount (username, password, host, port)
+  {
+    const proxy = this;
+    this.port.postMessage( {proxyRequest: "resetAccount", username: username, password: password, host: host, port: port} );
+    return new Promise(
+      function(resolver, rejecter)
+      {
+        proxy.valueReceivers.resetAccount = function(result)
+          {
+            proxy.valueReceivers.resetAccount = undefined;
+            resolver( result );
+          };
+      }
+    );
+  }
+
+  // Inform the server that this client shuts down.
+  // No other requests may follow this message.
+  close()
+  {
+    // send a message that will make the internal channel in the Service Worker close.
+    this.port.postMessage({proxyRequest: "Close"});
+  }
+
+  unsubscribe(req)
+  {
+    // Send a message that will make the internal channel in the Service Worker close.
+    this.port.postMessage( {proxyRequest: "unsubscribe", request: req );
+  }
+
+  nextRequestId ()
+  {
+    this.requestId = this.requestId + 1;
+    return this.requestId + this.channelId;
+  }
+
+  send ( req, receiveValues )
+  {
+    // Create a correlation identifier and store it in the request.
+    if ( !req.corrId )
+    {
+      req.corrId = this.nextRequestId();
+    }
+    // Store the valueReceiver.
+    this.valueReceivers[ req.corrId ] = receiveValues;
+    // console.log( req );
+    // send the request through the channel to the service worker.
+    this.port.postMessage( req );
+    // return the elementary data for unsubscribing.
+    return {subject: req.subject, corrId: req.corrId};
+  }
+
+}
+////////////////////////////////////////////////////////////////////////////////
+//// PERSPECTIVESPROXY
+////////////////////////////////////////////////////////////////////////////////
 class PerspectivesProxy
 {
   constructor (channel)
@@ -543,6 +840,9 @@ class PerspectivesProxy
 
 module.exports = {
   Perspectives: Perspectives,
+  InternalChannelPromise: InternalChannelPromise,
+  ServiceWorkerChannelPromise: ServiceWorkerChannelPromise,
   createRequestEmitterImpl: createRequestEmitterImpl,
-  createTcpConnectionToPerspectives: createTcpConnectionToPerspectives
+  createTcpConnectionToPerspectives: createTcpConnectionToPerspectives,
+  createServiceWorkerConnectionToPerspectives: createServiceWorkerConnectionToPerspectives
 };
