@@ -1,23 +1,43 @@
+// BEGIN LICENSE
+// Perspectives Distributed Runtime
+// Copyright (C) 2019 Joop Ringelberg (joopringelberg@perspect.it), Cor Baars
+//
+// This program is free software: you can redistribute it and/or modify
+// it under the terms of the GNU General Public License as published by
+// the Free Software Foundation, either version 3 of the License, or
+// (at your option) any later version.
+//
+// This program is distributed in the hope that it will be useful,
+// but WITHOUT ANY WARRANTY; without even the implied warranty of
+// MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+// GNU General Public License for more details.
+//
+// You should have received a copy of the GNU General Public License
+// along with this program.  If not, see <https://www.gnu.org/licenses/>.
+//
+// Full text of this license can be found in the LICENSE file in the projects root.
+// END LICENSE
+
 /*
 This module is imported both by the core and by clients and bridges the gap between the two. It supports several architectures:
   1 with core and client in the same javascript process;
   2 with core and client in different javascript processes, connected by the Channel Messaging API
     https://developer.mozilla.org/en-US/docs/Web/API/Channel_Messaging_API
-  3 with core and client in different processes, connected by TCP.
+  3 with core and client in different processes, connected by TCP. OBSOLETE!! We have commented the code out. It will serve as an example when we develop the Language Server. See the design text "TCP architecture.txt".
 The core resolves two promises:
-  - one called Perspectives, resolving to an instance of PerspectivesProxy with an InternalChannel, to be used in the first architecture by direct import;
+  - one called PDRproxy, resolving to an instance of PerspectivesProxy with an InternalChannel, to be used in the first architecture by direct import;
   - one called InternalChannel, resolving to an instance of InternalChannel, to be used in the second architecture, used by the Service Worker by direct import;
-Then there are two functions to be used by clients, that both resolve the Perspectives promise.
-  - createServiceWorkerConnectionToPerspectives, for the second architecture. It resolves the Perspectives promise with an instance of ServiceWorkerChannel, that *uses* the InternalChannel to communicate with the core;
-  - createTcpConnectionToPerspectives, for the third architecture. It resolves the Perspectives promise with an instance of TcpChannel.
-The Perspectives promise is imported by all of the modules in perspectives-react that must connect to the core.
+Then there are two functions to be used by clients, that both resolve the PDRproxy promise.
+  - createServiceWorkerConnectionToPerspectives, for the second architecture. It resolves the PDRproxy promise with an instance of ServiceWorkerChannel, that *uses* the InternalChannel to communicate with the core;
+  - createTcpConnectionToPerspectives, for the third architecture. It resolves the PDRproxy promise with an instance of TcpChannel.
+The PDRproxy promise is imported by all of the modules in perspectives-react that must connect to the core.
 */
 
 ////////////////////////////////////////////////////////////////////////////////
 //// CLIENT SIDE PROMISES
 ////////////////////////////////////////////////////////////////////////////////
 
-let perspectivesResolver, perspectivesRejecter;
+let pdrProxyResolver, pdrProxyRejecter;
 let internalChannelResolver, internalChannelRejecter;
 let serviceWorkerChannelResolver, serviceWorkerChannelRejecter;
 
@@ -26,11 +46,11 @@ let serviceWorkerChannelResolver, serviceWorkerChannelRejecter;
 // turn up as 'output' of a Producer, ready to be consumed by some process.
 // The channel uses the emit function as a callback: when it has a request to send, it calls 'emit'
 // after wrapping the request in the appropriate constructor (usually the emitStep).
-const Perspectives = new Promise(
+const PDRproxy = new Promise(
   function (resolve, reject)
   {
-    perspectivesResolver = resolve;
-    perspectivesRejecter = reject;
+    pdrProxyResolver = resolve;
+    pdrProxyRejecter = reject;
   });
 
 // This promise will resolve to an instance of the InternalChannel.
@@ -51,9 +71,45 @@ const ServiceWorkerChannelPromise = new Promise(
     serviceWorkerChannelRejecter = reject;
   });
 
+////////////////////////////////////////////////////////////////////////////////
+//// RESOLVE AND CONFIGURE PDRPROXY WITH A CHANNEL
+////////////////////////////////////////////////////////////////////////////////
+// Creates an instance of PerspectivesProxy with a selected type of channel and
+// fullfills the PDRproxy with it.
+// Options as described in the module Control.Aff.Sockets:
+// type TCPOptions opts = {port :: Port, host :: Host, allowHalfOpen :: Boolean | opts}
+// type Port = Int
+// type Host = String
+function configurePDRproxy (channeltype/*, options*/)
+{
+  switch( channeltype )
+  {
+    case "internalChannel":
+      InternalChannelPromise.then(
+        function( ic )
+        {
+          pdrProxyResolver( new PerspectivesProxy( ic ) );
+        }
+      );
+      break;
+    // case "tcpChannel":
+    //   pdrProxyResolver( new PerspectivesProxy( new TcpChannel( options ) ) );
+    //   break;
+    case "serviceWorkerChannel":
+      InternalChannelPromise.then(function(internalChannel)
+       {
+         // TODO. Wie gebruikt deze promise?
+         const serviceWorkerChannel = new ServiceWorkerChannel( internalChannel );
+         serviceWorkerChannelResolver( serviceWorkerChannel );
+         pdrProxyResolver( new PerspectivesProxy( serviceWorkerChannel ) );
+       });
+       break;
+  }
+}
+
 
 ////////////////////////////////////////////////////////////////////////////////
-//// SERVER SIDE RESOLVER TO INTERNAL CHANNEL AND PERSPECTIVES
+//// SERVER SIDE RESOLVER TO INTERNAL CHANNEL
 ////////////////////////////////////////////////////////////////////////////////
 
 // This function will be called from Perspectives Core if it want to set up an internal channel to a GUI.
@@ -62,186 +118,188 @@ function createRequestEmitterImpl (emitStep, finishStep, emit)
 {
   try
   {
-    // Resolve the Perspectives promise and InternalChannelPromise made above for the proxy.
-    const icp = new InternalChannel(emitStep, finishStep, emit)
-    const pp = new PerspectivesProxy(icp);
-    perspectivesResolver(pp);
+    // Resolve InternalChannelPromise made above.
+    const icp = new InternalChannel(emitStep, finishStep, emit);
     internalChannelResolver (icp);
   }
   catch(e)
   {
-    perspectivesRejecter(e);
     internalChannelRejecter(e);
   }
 }
 
 ////////////////////////////////////////////////////////////////////////////////
-//// CLIENT SIDE RESOLVER TO TCP CHANNEL
+//// CLIENT SIDE RESOLVER TO TCP CHANNEL OBSOLETE
 ////////////////////////////////////////////////////////////////////////////////
 // Top level entry function to set up a TCP channel with a Perspectives Core endpoint.
 // From module Control.Aff.Sockets:
 // type TCPOptions opts = {port :: Port, host :: Host, allowHalfOpen :: Boolean | opts}
 // type Port = Int
 // type Host = String
-function createTcpConnectionToPerspectives (options)
-{
-  try
-  {
-    // Resolve the Perspectives promise made above for the proxy.
-    perspectivesResolver(new PerspectivesProxy(new TcpChannel(options)));
-  }
-  catch (e)
-  {
-    perspectivesRejecter(e);
-  }
-}
+// function createTcpConnectionToPerspectives (options)
+// {
+//   try
+//   {
+//     // Resolve the PDRproxy promise made above for the proxy.
+//     pdrProxyResolver(new PerspectivesProxy(new TcpChannel(options)));
+//   }
+//   catch (e)
+//   {
+//     pdrProxyRejecter(e);
+//   }
+// }
 
 ////////////////////////////////////////////////////////////////////////////////
 //// CLIENT SIDE RESOLVER TO SERVICE WORKER CHANNEL AND SERVICE WORKER CHANNEL PROMISE
-//// This code will be executed by the client!
+//// This code will be executed by the client! OBSOLETE
 ////////////////////////////////////////////////////////////////////////////////
 function createServiceWorkerConnectionToPerspectives ()
 {
   try
   {
-    // Resolve the Perspectives promise with the InternalChannel created by the core.
+    // Resolve the PDRproxy promise with the InternalChannel created by the core.
     InternalChannelPromise.then(function(internalChannel)
      {
        const serviceWorkerChannel = new ServiceWorkerChannel( internalChannel );
        serviceWorkerChannelResolver( serviceWorkerChannel );
-       perspectivesResolver( new PerspectivesProxy( serviceWorkerChannel ) );
+       pdrProxyResolver( new PerspectivesProxy( serviceWorkerChannel ) );
      });
   }
   catch(e)
   {
     serviceWorkerChannelRejecter( e );
-    perspectivesRejecter( e );
+    pdrProxyRejecter( e );
   }
 }
 
 ////////////////////////////////////////////////////////////////////////////////
 //// TCP CHANNEL
 ////////////////////////////////////////////////////////////////////////////////
-class TcpChannel
-{
-  constructor (options)
-  {
-    let connection;
-    this.requestId = -1;
-    const valueReceivers = {};
-    this.connection = require("net").createConnection(
-      options,
-      // message will be in base64. Appending a string to it converts it to a new string.
-      function ()
-      {
-        console.log("Connection made.")
-      });
-    connection = this.connection;
-    this.valueReceivers = valueReceivers;
-
-    connection.on('data',
-      // message will be in base64. Appending a string to it converts it to a new string.
-      function (message)
-      {
-        const messages = (message + "").split("\n");
-        messages.forEach( function(m) // m :: PerspectivesApiTypes.ResponseRecord
-        {
-          if (m !== "")
-          {
-            try
-            {
-              const responseRecord = JSON.parse(m);
-              valueReceivers[responseRecord.corrId](responseRecord);
-            }
-            catch(e)
-            {
-              console.log(e);
-            }
-          }
-        });
-      });
-
-    // https://nodejs.org/docs/latest-v6.x/api/net.html#net_event_error
-    // Emitted when an error occurs. The 'close' event will be called
-    // directly following this event.
-    connection.on('error',
-      function(error)
-      {
-        console.log( "Error on the connection: " + error );
-        // Half-closes the socket. i.e., it sends a FIN packet.
-        // It is possible the server will still send some data.
-        connection.end();
-      });
-
-    // https://nodejs.org/docs/latest-v6.x/api/net.html#net_event_close
-    // Emitted once the socket is fully closed. The argument had_error is a boolean
-    // which says if the socket was closed due to a transmission error.
-    connection.on('close',
-      function(had_error)
-      {
-        // No data will come anymore.
-        if ( had_error )
-        {
-          console.log("The Perspectives Core has hung up because of an error.")
-        }
-        else
-        {
-          console.log("The Perspectives Core has hung up.")
-        }
-      });
-
-      // https://nodejs.org/docs/latest-v6.x/api/net.html#net_event_end
-      // Emitted when the other end of the socket sends a FIN packet.
-      // By default (allowHalfOpen == false) the socket will destroy its file
-      // descriptor once it has written out its pending write queue.
-      connection.on('end',
-        function()
-        {
-          // This means the other side will no longer send data.
-          console.log("The Perspectives Core has hung up.")
-        });
-  }
-
-  nextRequestId ()
-  {
-    this.requestId = this.requestId + 1;
-    return this.requestId.toString();
-  }
-
-  // close will lead the messageProducer of the perspectives core to receive (Right unit).
-  close()
-  {
-    this.connection.end();
-    this.send = function()
-    {
-      throw( "This client has shut down!");
-    };
-  }
-
-  // req has the following format (taken from: module Perspectives.Api)
-  //   { request :: String
-  //   , subject :: String
-  //   , predicate :: String
-  //   , setterId :: ReactStateSetterIdentifier}
-  // type ReactStateSetterIdentifier = String
-  // Returns a structure that can be used by the caller to unsubscribe from the core dependency network.
-  send(req, receiveValues)
-  {
-    req.corrId = this.nextRequestId();
-    this.valueReceivers[ req.corrId ] = receiveValues;
-    this.connection.write(JSON.stringify(req) + "\n");
-    // return the elementary data for unsubscribing.
-    return {subject: req.subject, predicate: req.corrId};
-  }
-
-  unsubscribe(req)
-  {
-    delete this.valueReceivers[req.setterId];
-    this.connection.write(
-      {request: "Unsubscribe", subject: req.subject, predicate: req.predicate, setterId: req.setterId}
-    );
-  }
-}
+// class TcpChannel
+// {
+//   constructor (options)
+//   {
+//     let connection;
+//     this.requestId = -1;
+//     const valueReceivers = {};
+//     // This creates a net.Socket (https://nodejs.org/api/net.html#net_net_createconnection).
+//     this.connection = require("net").createConnection(
+//       options,
+//       // message will be in base64. Appending a string to it converts it to a new string.
+//       function ()
+//       {
+//         console.log("Connection made.");
+//       });
+//     connection = this.connection;
+//     this.valueReceivers = valueReceivers;
+//
+//     // See: https://nodejs.org/api/net.html#net_class_net_socket
+//     connection.on('data',
+//       // message will be in base64. Appending a string to it converts it to a new string.
+//       function (message)
+//       {
+//         const messages = (message + "").split("\n");
+//         messages.forEach( function(m) // m :: PerspectivesApiTypes.ResponseRecord
+//         {
+//           if (m !== "")
+//           {
+//             try
+//             {
+//               const responseRecord = JSON.parse(m);
+//               valueReceivers[responseRecord.corrId](responseRecord);
+//             }
+//             catch(e)
+//             {
+//               console.log(e);
+//             }
+//           }
+//         });
+//       });
+//
+//     // https://nodejs.org/docs/latest-v6.x/api/net.html#net_event_error
+//     // Emitted when an error occurs. The 'close' event will be called
+//     // directly following this event.
+//     connection.on('error',
+//       function(error)
+//       {
+//         console.log( "Error on the connection: " + error );
+//         // Half-closes the socket. i.e., it sends a FIN packet.
+//         // It is possible the server will still send some data.
+//         connection.end();
+//       });
+//
+//     // https://nodejs.org/docs/latest-v6.x/api/net.html#net_event_close
+//     // Emitted once the socket is fully closed. The argument had_error is a boolean
+//     // which says if the socket was closed due to a transmission error.
+//     connection.on('close',
+//       function(had_error)
+//       {
+//         // No data will come anymore.
+//         if ( had_error )
+//         {
+//           console.log("The Perspectives Core has hung up because of an error.");
+//         }
+//         else
+//         {
+//           console.log("The Perspectives Core has hung up.");
+//         }
+//       });
+//
+//       // https://nodejs.org/docs/latest-v6.x/api/net.html#net_event_end
+//       // Emitted when the other end of the socket sends a FIN packet.
+//       // By default (allowHalfOpen == false) the socket will destroy its file
+//       // descriptor once it has written out its pending write queue.
+//       connection.on('end',
+//         function()
+//         {
+//           // This means the other side will no longer send data.
+//           console.log("The Perspectives Core has hung up.");
+//         });
+//   }
+//
+//   nextRequestId ()
+//   {
+//     this.requestId = this.requestId + 1;
+//     return this.requestId.toString();
+//   }
+//
+//   // close will lead the messageProducer of the perspectives core to receive (Right unit).
+//   close()
+//   {
+//     // https://nodejs.org/api/net.html#net_socket_end_data_encoding_callback
+//     this.connection.end();
+//     this.send = function()
+//     {
+//       throw( "This client has shut down!");
+//     };
+//   }
+//
+//   // req has the following format (taken from: module Perspectives.Api)
+//   //   { request :: String
+//   //   , subject :: String
+//   //   , predicate :: String
+//   //   , setterId :: ReactStateSetterIdentifier}
+//   // type ReactStateSetterIdentifier = String
+//   // Returns a structure that can be used by the caller to unsubscribe from the core dependency network.
+//   send(req, receiveValues)
+//   {
+//     req.corrId = this.nextRequestId();
+//     this.valueReceivers[ req.corrId ] = receiveValues;
+//     // https://nodejs.org/api/net.html#net_socket_write_data_encoding_callback
+//     this.connection.write(JSON.stringify(req) + "\n");
+//     // return the elementary data for unsubscribing.
+//     return {subject: req.subject, predicate: req.corrId};
+//   }
+//
+//   unsubscribe(req)
+//   {
+//     delete this.valueReceivers[req.setterId];
+//     // https://nodejs.org/api/net.html#net_socket_write_data_encoding_callback
+//     this.connection.write(
+//       {request: "Unsubscribe", subject: req.subject, predicate: req.predicate, setterId: req.setterId}
+//     );
+//   }
+// }
 
 ////////////////////////////////////////////////////////////////////////////////
 //// INTERNAL CHANNEL
@@ -303,7 +361,7 @@ class InternalChannel
 //// This code will be executed by the client!
 //// The ServiceWorkerChannel is a proxy for the ServiceWorker for the client.
 ////////////////////////////////////////////////////////////////////////////////
-class ServiceWorkerChannel ()
+class ServiceWorkerChannel
 {
   constructor( )
   {
@@ -322,7 +380,7 @@ class ServiceWorkerChannel ()
         if ('serviceWorker' in navigator)
         {
           navigator.serviceWorker.register(
-            'perspectives-service-worker.js',
+            'perspectives-serviceworker.js',
             {
                 scope: './'
             }).then(function (registration)
@@ -341,7 +399,7 @@ class ServiceWorkerChannel ()
                 }
                 else
                 {
-                  reject ("Could not get serviceWorker from registration for an unknown reason.")
+                  reject ("Could not get serviceWorker from registration for an unknown reason.");
                 }
               }).catch (function (error)
                 {
@@ -352,7 +410,7 @@ class ServiceWorkerChannel ()
         }
         else
         {
-            reject( "This browser does not support service workers.")
+            reject( "This browser does not support service workers.");
         }
       });
 
@@ -367,7 +425,7 @@ class ServiceWorkerChannel ()
         serviceWorkerChannel.port.onmessage = serviceWorkerChannel.handleServiceWorkerResponse;
 
         // Transfer one port to the service worker.
-        serviceWorker.postMessage('port', '*', [channel.port2]);
+        serviceWorker.postMessage('porttransfer', [channel.port2]);
       }
     );
   }
@@ -381,13 +439,13 @@ class ServiceWorkerChannel ()
     {
       // {corrId: i, error: s} where s is is a String, i an int.
       // we just pass errors on.
-      valueReceivers[ e.data.corrId ]( e.data );
+      this.valueReceivers[ e.data.corrId ]( e.data );
     }
     else if ( e.data.result )
     {
       // {corrId: i, result: s} where s is an Array of String, i an int.
       // pass the result on
-      valueReceivers[ e.data.corrId ]( e.data );
+      this.valueReceivers[ e.data.corrId ]( e.data );
     }
     // Then we have a category of incoming messages that originate in the service worker itself,
     // often in response to a specific request sent by the proxy.
@@ -405,7 +463,7 @@ class ServiceWorkerChannel ()
           break;
         case "isUserLoggedIn":
           // {serviceWorkerMessage: "isUserLoggedIn", isUserLoggedIn, b} where b is a boolean.
-          valueReceivers.isUserLoggedIn( e.data.isUserLoggedIn );
+          this.valueReceivers.isUserLoggedIn( e.data.isUserLoggedIn );
           break;
         case "authenticate":
           // {serviceWorkerMessage: "authenticate", authenticationResult, n} where n is an integer.
@@ -413,12 +471,12 @@ class ServiceWorkerChannel ()
           // UnknownUser = 0
           // WrongCredentials = 1
           // OK CouchdbUser = 2
-          valueReceivers.authenticate( e.data.authenticationResult );
+          this.valueReceivers.authenticate( e.data.authenticationResult );
           break;
 
         case "resetAccount":
-          // {serviceWorkerMessage: "resetAccount"} where b is a boolean.
-          valueReceivers.resetAccount( true );
+          // {serviceWorkerMessage: "resetAccount", resetSuccesful: b} where b is a boolean.
+          this.valueReceivers.resetAccount( e.data.resetSuccesful );
           break;
       }
     }
@@ -428,9 +486,9 @@ class ServiceWorkerChannel ()
   isUserLoggedIn ()
   {
     const proxy = this;
-    this.port.postMessage( {proxyRequest: "isUserLoggedIn"} );
+    this.port.postMessage( {proxyRequest: "isUserLoggedIn", channelId: proxy.channelId} );
     return new Promise(
-      function(resolver, rejecter)
+      function(resolver/*, rejecter*/)
       {
         proxy.valueReceivers.isUserLoggedIn = function(isLoggedIn)
           {
@@ -448,9 +506,9 @@ class ServiceWorkerChannel ()
   authenticate (username, password, host, port)
   {
     const proxy = this;
-    this.port.postMessage( {proxyRequest: "authenticate", username: username, password: password, host: host, port: port} );
+    this.port.postMessage( {proxyRequest: "authenticate", username: username, password: password, host: host, port: port, channelId: proxy.channelId} );
     return new Promise(
-      function(resolver, rejecter)
+      function(resolver/*, rejecter*/)
       {
         proxy.valueReceivers.authenticate = function(result)
           {
@@ -464,9 +522,9 @@ class ServiceWorkerChannel ()
   resetAccount (username, password, host, port)
   {
     const proxy = this;
-    this.port.postMessage( {proxyRequest: "resetAccount", username: username, password: password, host: host, port: port} );
+    this.port.postMessage( {proxyRequest: "resetAccount", username: username, password: password, host: host, port: port, channelId: proxy.channelId} );
     return new Promise(
-      function(resolver, rejecter)
+      function(resolver/*, rejecter*/)
       {
         proxy.valueReceivers.resetAccount = function(result)
           {
@@ -488,7 +546,7 @@ class ServiceWorkerChannel ()
   unsubscribe(req)
   {
     // Send a message that will make the internal channel in the Service Worker close.
-    this.port.postMessage( {proxyRequest: "unsubscribe", request: req );
+    this.port.postMessage( {proxyRequest: "unsubscribe", request: req } );
   }
 
   nextRequestId ()
@@ -565,10 +623,10 @@ class PerspectivesProxy
       }
       // This is the Effect.
       return function () {};
-    }
+    };
     req.reactStateSetter = handleErrors;
     // Move all properties to the default request to ensure we send a complete request.
-    Object.assign(defaultRequest,req)
+    Object.assign(defaultRequest,req);
     return this.channel.send( defaultRequest );
   }
 
@@ -682,7 +740,7 @@ class PerspectivesProxy
     return this.send(
       {request: "GetMeForContext", subject: externalRoleInstance},
       receiveValues
-    )
+    );
   }
 
   getUserIdentifier (receiveValues)
@@ -690,7 +748,7 @@ class PerspectivesProxy
     return this.send(
       {request: "GetUserIdentifier"},
       receiveValues
-    )
+    );
   }
 
   getLocalRoleSpecialisation( localAspectName, contextInstance, receiveValues )
@@ -717,7 +775,7 @@ class PerspectivesProxy
       {
         receiveResponse( r );
       }
-    )
+    );
   }
 
   // Create a context, bound to the given role instance.
@@ -731,7 +789,7 @@ class PerspectivesProxy
       {
         receiveResponse( r );
       }
-    )
+    );
   }
 
   // Either throws an error, or returns an array of context identifiers.
@@ -743,7 +801,7 @@ class PerspectivesProxy
       {
         receiveResponse( r );
       }
-    )
+    );
   }
 
   // Either throws an error, or returns an empty array.
@@ -756,7 +814,7 @@ class PerspectivesProxy
       {
         receiveResponse( r );
       }
-    )
+    );
   }
 
   // value is just a single string!
@@ -764,15 +822,15 @@ class PerspectivesProxy
   {
     this.send(
       {request: "SetProperty", subject: rolID, predicate: propertyName, object: value, authoringRole: myroletype},
-      function(r) {}
-    )
+      function() {}
+    );
   }
 
   deleteProperty (rolID, propertyName, myroletype)
   {
     this.send(
       {request: "DeleteProperty", subject: rolID, predicate: propertyName, authoringRole: myroletype},
-      function(r) {}
+      function() {}
     );
   }
 
@@ -780,7 +838,7 @@ class PerspectivesProxy
   {
     this.send(
       {request: "RemoveBinding", subject: rolID, authoringRole: myroletype},
-      function(r) {}
+      function() {}
     );
   }
 
@@ -788,7 +846,7 @@ class PerspectivesProxy
   {
     this.send(
       {request: "RemoveRol", subject: rolID, predicate: rolName, object: contextType, authoringRole: myroletype},
-      function(r) {}
+      function() {}
     );
   }
 
@@ -796,16 +854,16 @@ class PerspectivesProxy
   {
     this.send(
       {request: "DeleteRole", subject: rolName, predicate: contextID, authoringRole: myroletype},
-      function(r) {}
+      function() {}
     );
   }
 
 
-  bind (contextinstance, localRolName, contextType, rolDescription, myroletype, receiveResponse)
+  bind (contextinstance, localRolName, contextType, rolDescription, myroletype/*, receiveResponse*/)
   {
     this.send(
       {request: "Bind", subject: contextinstance, predicate: localRolName, object: contextType, rolDescription: rolDescription, authoringRole: myroletype },
-      function(r) {}
+      function() {}
     );
   }
 
@@ -813,7 +871,7 @@ class PerspectivesProxy
   {
     this.send(
       {request: "Bind_", subject: binder, object: binding, authoringRole: myroletype},
-      function(r) {}
+      function() {}
     );
   }
 
@@ -828,21 +886,22 @@ class PerspectivesProxy
 
   // We have room for checkBinding_( <binder>, <binding>, [() -> undefined] )
 
-  createRole (contextinstance, rolType, myroletype, receiveResponse)
+  createRole (contextinstance, rolType, myroletype/*, receiveResponse*/)
   {
     this.send(
       {request: "CreateRol", subject: contextinstance, predicate: rolType, authoringRole: myroletype },
-      function(r) {}
+      function() {}
     );
   }
 
 }
 
 module.exports = {
-  Perspectives: Perspectives,
+  PDRproxy: PDRproxy,
   InternalChannelPromise: InternalChannelPromise,
   ServiceWorkerChannelPromise: ServiceWorkerChannelPromise,
   createRequestEmitterImpl: createRequestEmitterImpl,
-  createTcpConnectionToPerspectives: createTcpConnectionToPerspectives,
-  createServiceWorkerConnectionToPerspectives: createServiceWorkerConnectionToPerspectives
+  // createTcpConnectionToPerspectives: createTcpConnectionToPerspectives,
+  createServiceWorkerConnectionToPerspectives: createServiceWorkerConnectionToPerspectives,
+  configurePDRproxy: configurePDRproxy
 };
