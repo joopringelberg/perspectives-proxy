@@ -3,14 +3,14 @@ const path = require("path");
 module.exports = {
   entry: path.join(__dirname, "src/perspectivesApiProxy.js" ),
   output: {
-    library: "perspectivesProxy",
+    library: "perspectives-proxy",
     libraryTarget: "umd",
     filename: "perspectives-proxy.js",
     path: path.join(__dirname, "dist")
   },
   watch: false,
   mode: "development",
-  target: "electron-renderer",
+  target: "web",
   module: {
     rules: [{
         test: /.jsx?$/,
@@ -20,7 +20,7 @@ module.exports = {
             loader: "babel-loader",
             options: {
               presets: [
-                "env"
+                '@babel/preset-env'
               ]
             }
           }

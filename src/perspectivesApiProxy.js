@@ -82,6 +82,7 @@ const ServiceWorkerChannelPromise = new Promise(
 // type Host = String
 function configurePDRproxy (channeltype/*, options*/)
 {
+  let serviceWorkerChannel;
   switch( channeltype )
   {
     case "internalChannel":
@@ -96,17 +97,13 @@ function configurePDRproxy (channeltype/*, options*/)
     //   pdrProxyResolver( new PerspectivesProxy( new TcpChannel( options ) ) );
     //   break;
     case "serviceWorkerChannel":
-      InternalChannelPromise.then(function(internalChannel)
-       {
-         // TODO. Wie gebruikt deze promise?
-         const serviceWorkerChannel = new ServiceWorkerChannel( internalChannel );
-         serviceWorkerChannelResolver( serviceWorkerChannel );
-         pdrProxyResolver( new PerspectivesProxy( serviceWorkerChannel ) );
-       });
+       // TODO. Wie gebruikt deze promise?
+       serviceWorkerChannel = new ServiceWorkerChannel();
+       serviceWorkerChannelResolver( serviceWorkerChannel );
+       pdrProxyResolver( new PerspectivesProxy( serviceWorkerChannel ) );
        break;
   }
 }
-
 
 ////////////////////////////////////////////////////////////////////////////////
 //// SERVER SIDE RESOLVER TO INTERNAL CHANNEL
@@ -127,179 +124,6 @@ function createRequestEmitterImpl (emitStep, finishStep, emit)
     internalChannelRejecter(e);
   }
 }
-
-////////////////////////////////////////////////////////////////////////////////
-//// CLIENT SIDE RESOLVER TO TCP CHANNEL OBSOLETE
-////////////////////////////////////////////////////////////////////////////////
-// Top level entry function to set up a TCP channel with a Perspectives Core endpoint.
-// From module Control.Aff.Sockets:
-// type TCPOptions opts = {port :: Port, host :: Host, allowHalfOpen :: Boolean | opts}
-// type Port = Int
-// type Host = String
-// function createTcpConnectionToPerspectives (options)
-// {
-//   try
-//   {
-//     // Resolve the PDRproxy promise made above for the proxy.
-//     pdrProxyResolver(new PerspectivesProxy(new TcpChannel(options)));
-//   }
-//   catch (e)
-//   {
-//     pdrProxyRejecter(e);
-//   }
-// }
-
-////////////////////////////////////////////////////////////////////////////////
-//// CLIENT SIDE RESOLVER TO SERVICE WORKER CHANNEL AND SERVICE WORKER CHANNEL PROMISE
-//// This code will be executed by the client! OBSOLETE
-////////////////////////////////////////////////////////////////////////////////
-function createServiceWorkerConnectionToPerspectives ()
-{
-  try
-  {
-    // Resolve the PDRproxy promise with the InternalChannel created by the core.
-    InternalChannelPromise.then(function(internalChannel)
-     {
-       const serviceWorkerChannel = new ServiceWorkerChannel( internalChannel );
-       serviceWorkerChannelResolver( serviceWorkerChannel );
-       pdrProxyResolver( new PerspectivesProxy( serviceWorkerChannel ) );
-     });
-  }
-  catch(e)
-  {
-    serviceWorkerChannelRejecter( e );
-    pdrProxyRejecter( e );
-  }
-}
-
-////////////////////////////////////////////////////////////////////////////////
-//// TCP CHANNEL
-////////////////////////////////////////////////////////////////////////////////
-// class TcpChannel
-// {
-//   constructor (options)
-//   {
-//     let connection;
-//     this.requestId = -1;
-//     const valueReceivers = {};
-//     // This creates a net.Socket (https://nodejs.org/api/net.html#net_net_createconnection).
-//     this.connection = require("net").createConnection(
-//       options,
-//       // message will be in base64. Appending a string to it converts it to a new string.
-//       function ()
-//       {
-//         console.log("Connection made.");
-//       });
-//     connection = this.connection;
-//     this.valueReceivers = valueReceivers;
-//
-//     // See: https://nodejs.org/api/net.html#net_class_net_socket
-//     connection.on('data',
-//       // message will be in base64. Appending a string to it converts it to a new string.
-//       function (message)
-//       {
-//         const messages = (message + "").split("\n");
-//         messages.forEach( function(m) // m :: PerspectivesApiTypes.ResponseRecord
-//         {
-//           if (m !== "")
-//           {
-//             try
-//             {
-//               const responseRecord = JSON.parse(m);
-//               valueReceivers[responseRecord.corrId](responseRecord);
-//             }
-//             catch(e)
-//             {
-//               console.log(e);
-//             }
-//           }
-//         });
-//       });
-//
-//     // https://nodejs.org/docs/latest-v6.x/api/net.html#net_event_error
-//     // Emitted when an error occurs. The 'close' event will be called
-//     // directly following this event.
-//     connection.on('error',
-//       function(error)
-//       {
-//         console.log( "Error on the connection: " + error );
-//         // Half-closes the socket. i.e., it sends a FIN packet.
-//         // It is possible the server will still send some data.
-//         connection.end();
-//       });
-//
-//     // https://nodejs.org/docs/latest-v6.x/api/net.html#net_event_close
-//     // Emitted once the socket is fully closed. The argument had_error is a boolean
-//     // which says if the socket was closed due to a transmission error.
-//     connection.on('close',
-//       function(had_error)
-//       {
-//         // No data will come anymore.
-//         if ( had_error )
-//         {
-//           console.log("The Perspectives Core has hung up because of an error.");
-//         }
-//         else
-//         {
-//           console.log("The Perspectives Core has hung up.");
-//         }
-//       });
-//
-//       // https://nodejs.org/docs/latest-v6.x/api/net.html#net_event_end
-//       // Emitted when the other end of the socket sends a FIN packet.
-//       // By default (allowHalfOpen == false) the socket will destroy its file
-//       // descriptor once it has written out its pending write queue.
-//       connection.on('end',
-//         function()
-//         {
-//           // This means the other side will no longer send data.
-//           console.log("The Perspectives Core has hung up.");
-//         });
-//   }
-//
-//   nextRequestId ()
-//   {
-//     this.requestId = this.requestId + 1;
-//     return this.requestId.toString();
-//   }
-//
-//   // close will lead the messageProducer of the perspectives core to receive (Right unit).
-//   close()
-//   {
-//     // https://nodejs.org/api/net.html#net_socket_end_data_encoding_callback
-//     this.connection.end();
-//     this.send = function()
-//     {
-//       throw( "This client has shut down!");
-//     };
-//   }
-//
-//   // req has the following format (taken from: module Perspectives.Api)
-//   //   { request :: String
-//   //   , subject :: String
-//   //   , predicate :: String
-//   //   , setterId :: ReactStateSetterIdentifier}
-//   // type ReactStateSetterIdentifier = String
-//   // Returns a structure that can be used by the caller to unsubscribe from the core dependency network.
-//   send(req, receiveValues)
-//   {
-//     req.corrId = this.nextRequestId();
-//     this.valueReceivers[ req.corrId ] = receiveValues;
-//     // https://nodejs.org/api/net.html#net_socket_write_data_encoding_callback
-//     this.connection.write(JSON.stringify(req) + "\n");
-//     // return the elementary data for unsubscribing.
-//     return {subject: req.subject, predicate: req.corrId};
-//   }
-//
-//   unsubscribe(req)
-//   {
-//     delete this.valueReceivers[req.setterId];
-//     // https://nodejs.org/api/net.html#net_socket_write_data_encoding_callback
-//     this.connection.write(
-//       {request: "Unsubscribe", subject: req.subject, predicate: req.predicate, setterId: req.setterId}
-//     );
-//   }
-// }
 
 ////////////////////////////////////////////////////////////////////////////////
 //// INTERNAL CHANNEL
@@ -555,7 +379,7 @@ class ServiceWorkerChannel
     return this.requestId + this.channelId;
   }
 
-  send ( req, receiveValues )
+  send ( req )
   {
     // Create a correlation identifier and store it in the request.
     if ( !req.corrId )
@@ -563,7 +387,9 @@ class ServiceWorkerChannel
       req.corrId = this.nextRequestId();
     }
     // Store the valueReceiver.
-    this.valueReceivers[ req.corrId ] = receiveValues;
+    this.valueReceivers[ req.corrId ] = req.reactStateSetter;
+    // cannot serialise a function, remove it from the request.
+    req.reactStateSetter = undefined;
     // console.log( req );
     // send the request through the channel to the service worker.
     this.port.postMessage( req );
@@ -902,6 +728,135 @@ module.exports = {
   ServiceWorkerChannelPromise: ServiceWorkerChannelPromise,
   createRequestEmitterImpl: createRequestEmitterImpl,
   // createTcpConnectionToPerspectives: createTcpConnectionToPerspectives,
-  createServiceWorkerConnectionToPerspectives: createServiceWorkerConnectionToPerspectives,
+  // createServiceWorkerConnectionToPerspectives: createServiceWorkerConnectionToPerspectives,
   configurePDRproxy: configurePDRproxy
 };
+
+////////////////////////////////////////////////////////////////////////////////
+//// TCP CHANNEL
+////////////////////////////////////////////////////////////////////////////////
+// class TcpChannel
+// {
+//   constructor (options)
+//   {
+//     let connection;
+//     this.requestId = -1;
+//     const valueReceivers = {};
+//     // This creates a net.Socket (https://nodejs.org/api/net.html#net_net_createconnection).
+//     this.connection = require("net").createConnection(
+//       options,
+//       // message will be in base64. Appending a string to it converts it to a new string.
+//       function ()
+//       {
+//         console.log("Connection made.");
+//       });
+//     connection = this.connection;
+//     this.valueReceivers = valueReceivers;
+//
+//     // See: https://nodejs.org/api/net.html#net_class_net_socket
+//     connection.on('data',
+//       // message will be in base64. Appending a string to it converts it to a new string.
+//       function (message)
+//       {
+//         const messages = (message + "").split("\n");
+//         messages.forEach( function(m) // m :: PerspectivesApiTypes.ResponseRecord
+//         {
+//           if (m !== "")
+//           {
+//             try
+//             {
+//               const responseRecord = JSON.parse(m);
+//               valueReceivers[responseRecord.corrId](responseRecord);
+//             }
+//             catch(e)
+//             {
+//               console.log(e);
+//             }
+//           }
+//         });
+//       });
+//
+//     // https://nodejs.org/docs/latest-v6.x/api/net.html#net_event_error
+//     // Emitted when an error occurs. The 'close' event will be called
+//     // directly following this event.
+//     connection.on('error',
+//       function(error)
+//       {
+//         console.log( "Error on the connection: " + error );
+//         // Half-closes the socket. i.e., it sends a FIN packet.
+//         // It is possible the server will still send some data.
+//         connection.end();
+//       });
+//
+//     // https://nodejs.org/docs/latest-v6.x/api/net.html#net_event_close
+//     // Emitted once the socket is fully closed. The argument had_error is a boolean
+//     // which says if the socket was closed due to a transmission error.
+//     connection.on('close',
+//       function(had_error)
+//       {
+//         // No data will come anymore.
+//         if ( had_error )
+//         {
+//           console.log("The Perspectives Core has hung up because of an error.");
+//         }
+//         else
+//         {
+//           console.log("The Perspectives Core has hung up.");
+//         }
+//       });
+//
+//       // https://nodejs.org/docs/latest-v6.x/api/net.html#net_event_end
+//       // Emitted when the other end of the socket sends a FIN packet.
+//       // By default (allowHalfOpen == false) the socket will destroy its file
+//       // descriptor once it has written out its pending write queue.
+//       connection.on('end',
+//         function()
+//         {
+//           // This means the other side will no longer send data.
+//           console.log("The Perspectives Core has hung up.");
+//         });
+//   }
+//
+//   nextRequestId ()
+//   {
+//     this.requestId = this.requestId + 1;
+//     return this.requestId.toString();
+//   }
+//
+//   // close will lead the messageProducer of the perspectives core to receive (Right unit).
+//   close()
+//   {
+//     // https://nodejs.org/api/net.html#net_socket_end_data_encoding_callback
+//     this.connection.end();
+//     this.send = function()
+//     {
+//       throw( "This client has shut down!");
+//     };
+//   }
+//
+//   // req has the following format (taken from: module Perspectives.Api)
+//   //   { request :: String
+//   //   , subject :: String
+//   //   , predicate :: String
+//   //   , setterId :: ReactStateSetterIdentifier}
+//   // type ReactStateSetterIdentifier = String
+//   // Returns a structure that can be used by the caller to unsubscribe from the core dependency network.
+//   send(req, receiveValues)
+//   {
+//     req.corrId = this.nextRequestId();
+//     this.valueReceivers[ req.corrId ] = receiveValues;
+//     // https://nodejs.org/api/net.html#net_socket_write_data_encoding_callback
+//     this.connection.write(JSON.stringify(req) + "\n");
+//     // return the elementary data for unsubscribing.
+//     return {subject: req.subject, predicate: req.corrId};
+//   }
+//
+//   unsubscribe(req)
+//   {
+//     delete this.valueReceivers[req.setterId];
+//     // https://nodejs.org/api/net.html#net_socket_write_data_encoding_callback
+//     this.connection.write(
+//       {request: "Unsubscribe", subject: req.subject, predicate: req.predicate, setterId: req.setterId}
+//     );
+//   }
+// }
