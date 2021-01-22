@@ -28,7 +28,7 @@ The core resolves two promises:
   - one called PDRproxy, resolving to an instance of PerspectivesProxy with an InternalChannel, to be used in the first architecture by direct import;
   - one called InternalChannel, resolving to an instance of InternalChannel, to be used in the second architecture, used by the Service Worker by direct import;
 Then there are two functions to be used by clients, that both resolve the PDRproxy promise.
-  - createServiceWorkerConnectionToPerspectives, for the second architecture. It resolves the PDRproxy promise with an instance of ServiceWorkerChannel, that *uses* the InternalChannel to communicate with the core;
+  - createServiceWorkerConnectionToPerspectives, for the second architecture. It resolves the PDRproxy promise with an instance of SharedWorkerChannel, that *uses* the InternalChannel to communicate with the core;
   - createTcpConnectionToPerspectives, for the third architecture. It resolves the PDRproxy promise with an instance of TcpChannel.
 The PDRproxy promise is imported by all of the modules in perspectives-react that must connect to the core.
 */
@@ -39,7 +39,7 @@ The PDRproxy promise is imported by all of the modules in perspectives-react tha
 
 let pdrProxyResolver, pdrProxyRejecter;
 let internalChannelResolver, internalChannelRejecter;
-let serviceWorkerChannelResolver, serviceWorkerChannelRejecter;
+let sharedWorkerChannelResolver, sharedWorkerChannelRejecter;
 
 // This promise will resolve to an instance of PerspectivesProxy, with an InternalChannel.
 // The proxy uses the channel to actually send requests to the core. These requests will
@@ -62,13 +62,13 @@ const InternalChannelPromise = new Promise(
     internalChannelRejecter = reject;
   });
 
-// This promise will resolve to an instance of the the ServiceWorkerChannel.
+// This promise will resolve to an instance of the the SharedWorkerChannel.
 // It is used by InPlace, running in the same javascript process as this proxy.
-const ServiceWorkerChannelPromise = new Promise(
+const SharedWorkerChannelPromise = new Promise(
   function (resolve, reject)
   {
-    serviceWorkerChannelResolver = resolve;
-    serviceWorkerChannelRejecter = reject;
+    sharedWorkerChannelResolver = resolve;
+    sharedWorkerChannelRejecter = reject;
   });
 
 ////////////////////////////////////////////////////////////////////////////////
@@ -82,7 +82,7 @@ const ServiceWorkerChannelPromise = new Promise(
 // type Host = String
 function configurePDRproxy (channeltype/*, options*/)
 {
-  let serviceWorkerChannel;
+  let sharedWorkerChannel;
   switch( channeltype )
   {
     case "internalChannel":
@@ -96,11 +96,11 @@ function configurePDRproxy (channeltype/*, options*/)
     // case "tcpChannel":
     //   pdrProxyResolver( new PerspectivesProxy( new TcpChannel( options ) ) );
     //   break;
-    case "serviceWorkerChannel":
+    case "sharedWorkerChannel":
        // TODO. Wie gebruikt deze promise?
-       serviceWorkerChannel = new ServiceWorkerChannel();
-       serviceWorkerChannelResolver( serviceWorkerChannel );
-       pdrProxyResolver( new PerspectivesProxy( serviceWorkerChannel ) );
+       sharedWorkerChannel = new SharedWorkerChannel();
+       sharedWorkerChannelResolver( sharedWorkerChannel );
+       pdrProxyResolver( new PerspectivesProxy( sharedWorkerChannel ) );
        break;
   }
 }
@@ -181,11 +181,11 @@ class InternalChannel
 }
 
 ////////////////////////////////////////////////////////////////////////////////
-//// SERVICE WORKER CHANNEL
+//// SHARED WORKER CHANNEL
 //// This code will be executed by the client!
-//// The ServiceWorkerChannel is a proxy for the ServiceWorker for the client.
+//// The SharedWorkerChannel is a proxy for the ServiceWorker for the client.
 ////////////////////////////////////////////////////////////////////////////////
-class ServiceWorkerChannel
+class SharedWorkerChannel
 {
   constructor( )
   {
@@ -728,7 +728,7 @@ class PerspectivesProxy
 module.exports = {
   PDRproxy: PDRproxy,
   InternalChannelPromise: InternalChannelPromise,
-  ServiceWorkerChannelPromise: ServiceWorkerChannelPromise,
+  SharedWorkerChannelPromise: SharedWorkerChannelPromise,
   createRequestEmitterImpl: createRequestEmitterImpl,
   // createTcpConnectionToPerspectives: createTcpConnectionToPerspectives,
   // createServiceWorkerConnectionToPerspectives: createServiceWorkerConnectionToPerspectives,

@@ -15,7 +15,7 @@ The purescript module `perspectivesAPI` (part of perspectives-core) uses the exp
 
 The package perspectives-react-integrated-client evaluates the statement `configurePDRproxy( "internalChannel" )` to fulfil the promise `PDRproxy`. This promise, in turn, is imported by the modules in the package perspectives-react, used in the client package. This client runs in Electron and runs the PDR in the renderer process (i.e. on the web page).
 
-In contrast, the package inplace evaluates the statement `configurePDRproxy( "serviceWorkerChannel" )` to fulfil the promise `PDRproxy`. This client runs in the browser and deploys the PDR in a service worker.
+In contrast, the package inplace evaluates the statement `configurePDRproxy( "sharedWorkerChannel" )` to fulfil the promise `PDRproxy`. This client runs in the browser and deploys the PDR in a service worker.
 
 ## Build
 Create `dist/perspectives-proxy.js` by evaluating on the command line:
