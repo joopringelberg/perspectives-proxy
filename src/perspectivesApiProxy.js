@@ -157,7 +157,7 @@ class InternalChannel
     };
   }
 
-  // Returns a structure that can be used by the caller to unsubscribe from the core dependency network.
+  // Returns a promise for unsuscriber information of the form: {subject: req.subject, corrId: req.corrId}
   send ( req )
   {
     // Create a correlation identifier and store it in the request.
@@ -167,8 +167,12 @@ class InternalChannel
     }
     // console.log( req );
     this.emit( this.emitStep(req) )();
-    // return the elementary data for unsubscribing.
-    return {subject: req.subject, corrId: req.corrId};
+    // return a promise for the elementary data for unsubscribing.
+    return new Promise( function( resolver /*.rejecter*/)
+      {
+        resolver( {subject: req.subject, corrId: req.corrId} );
+      } );
+
   }
 
   unsubscribe(req)
@@ -189,10 +193,15 @@ class SharedWorkerChannel
 {
   constructor( )
   {
-    // const serviceWorkerChannel = this;
+    const serviceWorkerChannel = this;
     this.requestId = -1;
     this.valueReceivers = {};
-    this.channelId = undefined;
+    this.channelIdResolver = undefined;
+    this.channelId = new Promise(
+      function (resolve/*, reject*/)
+      {
+        serviceWorkerChannel.channelIdResolver = resolve;
+      });
     this.sharedWorker = new SharedWorker('perspectives-sharedWorker.js');
     this.port = this.sharedWorker.port;
 
@@ -286,7 +295,7 @@ class SharedWorkerChannel
           // As soon as the ServiceWorker receives a port from this proxy, it will return the channels id.
           // {serviceWorkerMessage: "channelId", channelId: i} where i is a multiple of a million.
           // Handle the port identification message that is sent by the service worker.
-          this.channelId = e.data.channelId;
+          this.channelIdResolver( e.data.channelId );
           break;
         case "isUserLoggedIn":
           // {serviceWorkerMessage: "isUserLoggedIn", isUserLoggedIn, b} where b is a boolean.
@@ -313,7 +322,7 @@ class SharedWorkerChannel
   isUserLoggedIn ()
   {
     const proxy = this;
-    this.port.postMessage( {proxyRequest: "isUserLoggedIn", channelId: proxy.channelId} );
+    proxy.channelId.then( channelId => proxy.port.postMessage( {proxyRequest: "isUserLoggedIn", channelId } ) );
     return new Promise(
       function(resolver/*, rejecter*/)
       {
@@ -333,7 +342,7 @@ class SharedWorkerChannel
   authenticate (username, password, host, port)
   {
     const proxy = this;
-    this.port.postMessage( {proxyRequest: "authenticate", username: username, password: password, host: host, port: port, channelId: proxy.channelId} );
+    proxy.channelId.then( channelId => this.port.postMessage( {proxyRequest: "authenticate", username: username, password: password, host: host, port: port, channelId } ));
     return new Promise(
       function(resolver/*, rejecter*/)
       {
@@ -349,7 +358,7 @@ class SharedWorkerChannel
   resetAccount (username, password, host, port)
   {
     const proxy = this;
-    this.port.postMessage( {proxyRequest: "resetAccount", username: username, password: password, host: host, port: port, channelId: proxy.channelId} );
+    proxy.channelId.then( channelId => this.port.postMessage( {proxyRequest: "resetAccount", username: username, password: password, host: host, port: port, channelId } ) );
     return new Promise(
       function(resolver/*, rejecter*/)
       {
@@ -378,26 +387,39 @@ class SharedWorkerChannel
 
   nextRequestId ()
   {
-    this.requestId = this.requestId + 1;
-    return this.requestId + this.channelId;
+    const proxy = this;
+    return this.channelId.then(
+      function( channelId )
+      {
+          proxy.requestId = proxy.requestId + 1;
+          return proxy.requestId + channelId;
+      }
+    );
   }
 
+  // Returns a promise for unsuscriber information of the form: {subject: req.subject, corrId: req.corrId}
   send ( req )
   {
-    // Create a correlation identifier and store it in the request.
-    if ( !req.corrId )
-    {
-      req.corrId = this.nextRequestId();
-    }
-    // Store the valueReceiver.
-    this.valueReceivers[ req.corrId ] = req.reactStateSetter;
-    // cannot serialise a function, remove it from the request.
-    req.reactStateSetter = undefined;
-    // console.log( req );
-    // send the request through the channel to the service worker.
-    this.port.postMessage( req );
-    // return the elementary data for unsubscribing.
-    return {subject: req.subject, corrId: req.corrId};
+    const proxy = this;
+    this.nextRequestId().then(
+      function( reqId )
+      {
+        // Create a correlation identifier and store it in the request.
+        if ( !req.corrId )
+        {
+          req.corrId = reqId;
+        }
+        // Store the valueReceiver.
+        proxy.valueReceivers[ req.corrId ] = req.reactStateSetter;
+        // cannot serialise a function, remove it from the request.
+        req.reactStateSetter = undefined;
+        // console.log( req );
+        // send the request through the channel to the service worker.
+        proxy.port.postMessage( req );
+        // return the elementary data for unsubscribing.
+        return {subject: req.subject, corrId: req.corrId};
+      }
+    );
   }
 
 }
@@ -418,7 +440,8 @@ class PerspectivesProxy
     this.channel.close();
   }
 
-  // Returns a structure that can be used by the caller to unsubscribe from the core dependency network.
+  // Returns a promise for unsuscriber information of the form: {subject: req.subject, corrId: req.corrId}
+  // that can be used by the caller to unsubscribe from the core dependency network.
   send (req, receiveValues, errorHandler)
   {
     const defaultRequest =
