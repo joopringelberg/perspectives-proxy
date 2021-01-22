@@ -189,69 +189,72 @@ class ServiceWorkerChannel
 {
   constructor( )
   {
-    const serviceWorkerChannel = this;
+    // const serviceWorkerChannel = this;
     this.requestId = -1;
     this.valueReceivers = {};
     this.channelId = undefined;
-    this.port = undefined;
+    this.sharedWorker = new SharedWorker('perspectives-sharedWorker.js');
+    this.port = this.sharedWorker.port;
 
     this.handleServiceWorkerResponse = this.handleServiceWorkerResponse.bind(this);
+    this.port.onmessage = this.handleServiceWorkerResponse;
 
+    // Currently, we don't need a ServiceWorker.
     // Register the service worker.
-    this.serviceWorkerPromise = new Promise(
-      function (resolve, reject)
-      {
-        if ('serviceWorker' in navigator)
-        {
-          navigator.serviceWorker.register(
-            'perspectives-serviceworker.js',
-            {
-                scope: './'
-            }).then(function (registration)
-              {
-                var serviceWorker;
-                if (registration.installing) {
-                  serviceWorker = registration.installing;
-                } else if (registration.waiting) {
-                  serviceWorker = registration.waiting;
-                } else if (registration.active) {
-                  serviceWorker = registration.active;
-                }
-                if (serviceWorker)
-                {
-                  resolve( serviceWorker );
-                }
-                else
-                {
-                  reject ("Could not get serviceWorker from registration for an unknown reason.");
-                }
-              }).catch (function (error)
-                {
-                  // Something went wrong during registration. The service-worker.js file
-                  // might be unavailable or contain a syntax error.
-                  reject( error );
-                });
-        }
-        else
-        {
-            reject( "This browser does not support service workers.");
-        }
-      });
+    // this.serviceWorkerPromise = new Promise(
+    //   function (resolve, reject)
+    //   {
+    //     if ('serviceWorker' in navigator)
+    //     {
+    //       navigator.serviceWorker.register(
+    //         'perspectives-serviceWorker.js',
+    //         {
+    //             scope: './'
+    //         }).then(function (registration)
+    //           {
+    //             var serviceWorker;
+    //             if (registration.installing) {
+    //               serviceWorker = registration.installing;
+    //             } else if (registration.waiting) {
+    //               serviceWorker = registration.waiting;
+    //             } else if (registration.active) {
+    //               serviceWorker = registration.active;
+    //             }
+    //             if (serviceWorker)
+    //             {
+    //               resolve( serviceWorker );
+    //             }
+    //             else
+    //             {
+    //               reject ("Could not get serviceWorker from registration for an unknown reason.");
+    //             }
+    //           }).catch (function (error)
+    //             {
+    //               // Something went wrong during registration. The service-worker.js file
+    //               // might be unavailable or contain a syntax error.
+    //               reject( error );
+    //             });
+    //     }
+    //     else
+    //     {
+    //         reject( "This browser does not support service workers.");
+    //     }
+    //   });
 
-    this.serviceWorkerPromise.then(
-      function( serviceWorker )
-      {
-        // Create a Channel. Save the port.
-        var channel = new MessageChannel();
-        serviceWorkerChannel.port = channel.port1;
-
-        // Listen to the port, handle all responses that come from the serviceworker.
-        serviceWorkerChannel.port.onmessage = serviceWorkerChannel.handleServiceWorkerResponse;
-
-        // Transfer one port to the service worker.
-        serviceWorker.postMessage('porttransfer', [channel.port2]);
-      }
-    );
+    // this.serviceWorkerPromise.then(
+    //   function( serviceWorker )
+    //   {
+    //     // Create a Channel. Save the port.
+    //     var channel = new MessageChannel();
+    //     serviceWorkerChannel.port = channel.port1;
+    //
+    //     // Listen to the port, handle all responses that come from the serviceworker.
+    //     serviceWorkerChannel.port.onmessage = serviceWorkerChannel.handleServiceWorkerResponse;
+    //
+    //     // Transfer one port to the service worker.
+    //     serviceWorker.postMessage('porttransfer', [channel.port2]);
+    //   }
+    // );
   }
 
   // The serviceworker sends messages of various types.
