@@ -80,7 +80,7 @@ const SharedWorkerChannelPromise = new Promise(
 // type TCPOptions opts = {port :: Port, host :: Host, allowHalfOpen :: Boolean | opts}
 // type Port = Int
 // type Host = String
-function configurePDRproxy (channeltype/*, options*/)
+function configurePDRproxy (channeltype, options)
 {
   let sharedWorkerChannel;
   switch( channeltype )
@@ -97,12 +97,24 @@ function configurePDRproxy (channeltype/*, options*/)
     //   pdrProxyResolver( new PerspectivesProxy( new TcpChannel( options ) ) );
     //   break;
     case "sharedWorkerChannel":
-       // TODO. Wie gebruikt deze promise?
-       sharedWorkerChannel = new SharedWorkerChannel();
+       sharedWorkerChannel = new SharedWorkerChannel( sharedWorkerHostingPDRPort() );
        sharedWorkerChannelResolver( sharedWorkerChannel );
        pdrProxyResolver( new PerspectivesProxy( sharedWorkerChannel ) );
        break;
+     case "hostPageChannel":
+        sharedWorkerChannel = new SharedWorkerChannel( options.pageHostingPDRPort() );
+        sharedWorkerChannelResolver( sharedWorkerChannel );
+        pdrProxyResolver( new PerspectivesProxy( sharedWorkerChannel ) );
+        break;
   }
+}
+
+////////////////////////////////////////////////////////////////////////////////
+//// PORT TO SHARED WORKER THAT HOSTS PDR
+////////////////////////////////////////////////////////////////////////////////
+function sharedWorkerHostingPDRPort()
+{
+  return new SharedWorker('perspectives-sharedworker.js').port;
 }
 
 ////////////////////////////////////////////////////////////////////////////////
@@ -191,7 +203,7 @@ class InternalChannel
 ////////////////////////////////////////////////////////////////////////////////
 class SharedWorkerChannel
 {
-  constructor( )
+  constructor( port )
   {
     const serviceWorkerChannel = this;
     this.requestId = -1;
@@ -202,68 +214,11 @@ class SharedWorkerChannel
       {
         serviceWorkerChannel.channelIdResolver = resolve;
       });
-    this.sharedWorker = new SharedWorker('perspectives-sharedWorker.js');
-    this.port = this.sharedWorker.port;
+    this.port = port;
 
     this.handleServiceWorkerResponse = this.handleServiceWorkerResponse.bind(this);
     this.port.onmessage = this.handleServiceWorkerResponse;
 
-    // Currently, we don't need a ServiceWorker.
-    // Register the service worker.
-    // this.serviceWorkerPromise = new Promise(
-    //   function (resolve, reject)
-    //   {
-    //     if ('serviceWorker' in navigator)
-    //     {
-    //       navigator.serviceWorker.register(
-    //         'perspectives-serviceWorker.js',
-    //         {
-    //             scope: './'
-    //         }).then(function (registration)
-    //           {
-    //             var serviceWorker;
-    //             if (registration.installing) {
-    //               serviceWorker = registration.installing;
-    //             } else if (registration.waiting) {
-    //               serviceWorker = registration.waiting;
-    //             } else if (registration.active) {
-    //               serviceWorker = registration.active;
-    //             }
-    //             if (serviceWorker)
-    //             {
-    //               resolve( serviceWorker );
-    //             }
-    //             else
-    //             {
-    //               reject ("Could not get serviceWorker from registration for an unknown reason.");
-    //             }
-    //           }).catch (function (error)
-    //             {
-    //               // Something went wrong during registration. The service-worker.js file
-    //               // might be unavailable or contain a syntax error.
-    //               reject( error );
-    //             });
-    //     }
-    //     else
-    //     {
-    //         reject( "This browser does not support service workers.");
-    //     }
-    //   });
-
-    // this.serviceWorkerPromise.then(
-    //   function( serviceWorker )
-    //   {
-    //     // Create a Channel. Save the port.
-    //     var channel = new MessageChannel();
-    //     serviceWorkerChannel.port = channel.port1;
-    //
-    //     // Listen to the port, handle all responses that come from the serviceworker.
-    //     serviceWorkerChannel.port.onmessage = serviceWorkerChannel.handleServiceWorkerResponse;
-    //
-    //     // Transfer one port to the service worker.
-    //     serviceWorker.postMessage('porttransfer', [channel.port2]);
-    //   }
-    // );
   }
 
   // The serviceworker sends messages of various types.
@@ -292,7 +247,7 @@ class SharedWorkerChannel
       {
         case "channelId":
           // This actually is a response that is not provoked by explicitly asking for it.
-          // As soon as the ServiceWorker receives a port from this proxy, it will return the channels id.
+          // As soon as the SharedWorker receives a port from this proxy, it will return the channels id.
           // {serviceWorkerMessage: "channelId", channelId: i} where i is a multiple of a million.
           // Handle the port identification message that is sent by the service worker.
           this.channelIdResolver( e.data.channelId );
