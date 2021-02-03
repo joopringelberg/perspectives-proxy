@@ -10,7 +10,7 @@ module.exports = {
   },
   watch: false,
   mode: "development",
-  target: "web",
+  target: "webworker",
   module: {
     rules: [{
         test: /.jsx?$/,

@@ -294,10 +294,10 @@ class SharedWorkerChannel
   // UnknownUser = 0
   // WrongCredentials = 1
   // OK CouchdbUser = 2
-  authenticate (username, password, host, port)
+  authenticate (username, password, host, port, publicRepo)
   {
     const proxy = this;
-    proxy.channelId.then( channelId => this.port.postMessage( {proxyRequest: "authenticate", username: username, password: password, host: host, port: port, channelId } ));
+    proxy.channelId.then( channelId => this.port.postMessage( {proxyRequest: "authenticate", username: username, password: password, host: host, port: port, channelId, publicRepo } ));
     return new Promise(
       function(resolver/*, rejecter*/)
       {
@@ -310,10 +310,10 @@ class SharedWorkerChannel
     );
   }
 
-  resetAccount (username, password, host, port)
+  resetAccount (username, password, host, port, publicRepo)
   {
     const proxy = this;
-    proxy.channelId.then( channelId => this.port.postMessage( {proxyRequest: "resetAccount", username: username, password: password, host: host, port: port, channelId } ) );
+    proxy.channelId.then( channelId => this.port.postMessage( {proxyRequest: "resetAccount", username: username, password: password, host: host, port: port, channelId, publicRepo } ) );
     return new Promise(
       function(resolver/*, rejecter*/)
       {
@@ -356,6 +356,7 @@ class SharedWorkerChannel
   send ( req )
   {
     const proxy = this;
+    // TODO MOET HIER GEEN RETURN VOOR STAAN?!
     this.nextRequestId().then(
       function( reqId )
       {
@@ -443,12 +444,12 @@ class PerspectivesProxy
     this.channel.unsubscribe(req);
   }
 
-  getRolBinding (contextID, rolName, receiveValues)
-  {
-    return this.send(
-      {request: "GetRolBinding", subject: contextID, predicate: rolName},
-      receiveValues);
-  }
+  // getRolBinding (contextID, rolName, receiveValues)
+  // {
+  //   return this.send(
+  //     {request: "GetRolBinding", subject: contextID, predicate: rolName},
+  //     receiveValues);
+  // }
 
   getRol (contextID, rolName, receiveValues)
   {
@@ -469,6 +470,14 @@ class PerspectivesProxy
     return this.send(
       {request: "GetProperty", subject: rolID, predicate: propertyName, object: roleType},
       receiveValues);
+  }
+
+  getPropertyFromLocalName (rolID, propertyName, roleType, receiveValues)
+  {
+    return this.send(
+      {request: "GetPropertyFromLocalName", subject: rolID, predicate: propertyName, object: roleType},
+      receiveValues
+    );
   }
 
   getBinding (rolID, receiveValues)
@@ -492,12 +501,12 @@ class PerspectivesProxy
       receiveValues);
   }
 
-  getUnqualifiedRoleBinders (rolID, localRolName, receiveValues)
-  {
-    return this.send(
-      {request: "GetUnqualifiedRoleBinders", subject: rolID, predicate: localRolName},
-      receiveValues);
-  }
+  // getUnqualifiedRoleBinders (rolID, localRolName, receiveValues)
+  // {
+  //   return this.send(
+  //     {request: "GetUnqualifiedRoleBinders", subject: rolID, predicate: localRolName},
+  //     receiveValues);
+  // }
 
   getViewProperties (rolType, viewName, receiveValues)
   {
@@ -699,6 +708,21 @@ class PerspectivesProxy
       {request: "CreateRol", subject: contextinstance, predicate: rolType, authoringRole: myroletype },
       function() {}
     );
+  }
+
+  matchContextName( name )
+  {
+    const proxy = this;
+    return new Promise(function(resolver)
+      {
+        proxy.send(
+          {request: "MatchContextName", subject: name},
+          function(qualifiedNames)
+          {
+            resolver( qualifiedNames );
+          }
+        );
+      });
   }
 
 }
