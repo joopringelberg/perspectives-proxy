@@ -138,6 +138,21 @@ function createRequestEmitterImpl (emitStep, finishStep, emit)
 }
 
 ////////////////////////////////////////////////////////////////////////////////
+//// REQUEST STRUCTURE
+////////////////////////////////////////////////////////////////////////////////
+const defaultRequest =
+  {
+    request: "WrongRequest",
+    subject: "The original request did not have a request type!",
+    predicate: "",
+    object: "",
+    reactStateSetter: function(){},
+    corrId: "",
+    contextDescription: {}
+  };
+
+
+////////////////////////////////////////////////////////////////////////////////
 //// INTERNAL CHANNEL
 ////////////////////////////////////////////////////////////////////////////////
 class InternalChannel
@@ -169,15 +184,31 @@ class InternalChannel
     };
   }
 
-  // Returns a promise for unsuscriber information of the form: {subject: req.subject, corrId: req.corrId}
-  send ( req )
+  // Returns a promise for unsubscriber information of the form: {subject: req.subject, corrId: req.corrId}
+  send ( req, fireAndForget )
   {
+    const proxy = this;
+    const setter = req.reactStateSetter;
     // Create a correlation identifier and store it in the request.
     if ( !req.corrId )
     {
       req.corrId = this.nextRequestId();
     }
     // console.log( req );
+    if (fireAndForget)
+    {
+      req.reactStateSetter = function( result )
+        {
+          // Move all properties to the default request to ensure we send a complete request.
+          proxy.send(
+            Object.assign(
+              Object.assign({}, defaultRequest),
+              { request: "Unsubscribe"
+              , subject: req.subject
+              , corrId: req.corrId}) );
+          setter( result );
+        };
+    }
     this.emit( this.emitStep(req) )();
     // return a promise for the elementary data for unsubscribing.
     return new Promise( function( resolver /*.rejecter*/)
@@ -216,15 +247,15 @@ class SharedWorkerChannel
       });
     this.port = port;
 
-    this.handleServiceWorkerResponse = this.handleServiceWorkerResponse.bind(this);
-    this.port.onmessage = this.handleServiceWorkerResponse;
+    this.handleWorkerResponse = this.handleWorkerResponse.bind(this);
+    this.port.onmessage = this.handleWorkerResponse;
 
   }
 
-  // The serviceworker sends messages of various types.
+  // The sharedworker or pageworker sends messages of various types.
   // Among them are responses received by the core.
   //
-  handleServiceWorkerResponse (e)
+  handleWorkerResponse (e)
   {
     if (e.data.error)
     {
@@ -353,20 +384,37 @@ class SharedWorkerChannel
   }
 
   // Returns a promise for unsuscriber information of the form: {subject: req.subject, corrId: req.corrId}
-  send ( req )
+  send ( req, fireAndForget )
   {
     const proxy = this;
-    // TODO MOET HIER GEEN RETURN VOOR STAAN?!
-    this.nextRequestId().then(
+    return this.nextRequestId().then(
       function( reqId )
       {
+        const setter = req.reactStateSetter;
         // Create a correlation identifier and store it in the request.
         if ( !req.corrId )
         {
           req.corrId = reqId;
         }
         // Store the valueReceiver.
-        proxy.valueReceivers[ req.corrId ] = req.reactStateSetter;
+        if (fireAndForget)
+        {
+          proxy.valueReceivers[ req.corrId ] = function( result )
+            {
+              // Move all properties to the default request to ensure we send a complete request.
+              proxy.send(
+                Object.assign(
+                  Object.assign({}, defaultRequest),
+                  { request: "Unsubscribe"
+                  , subject: req.subject
+                  , corrId: req.corrId}) );
+              setter( result );
+            };
+        }
+        else
+        {
+          proxy.valueReceivers[ req.corrId ] = setter;
+        }
         // cannot serialise a function, remove it from the request.
         req.reactStateSetter = undefined;
         // console.log( req );
@@ -398,33 +446,15 @@ class PerspectivesProxy
 
   // Returns a promise for unsuscriber information of the form: {subject: req.subject, corrId: req.corrId}
   // that can be used by the caller to unsubscribe from the core dependency network.
-  send (req, receiveValues, errorHandler)
+  send (req, receiveValues, fireAndForget)
   {
-    const defaultRequest =
-      {
-        request: "WrongRequest",
-        subject: "The original request did not have a request type!",
-        predicate: "",
-        object: "",
-        reactStateSetter: handleErrors,
-        corrId: "",
-        contextDescription: {}
-      };
-
     // Handle errors here. Use `errorHandler` if provided by the PerspectivesProxy method, otherwise
     // just log a warning on the console.
     const handleErrors = function(response) // response = PerspectivesApiTypes.ResponseRecord
     {
       if (response.error)
       {
-        if (errorHandler)
-        {
-          errorHandler( response.error );
-        }
-        else
-        {
-          console.warn( defaultRequest.request + ": " + response.error );
-        }
+        console.warn( defaultRequest.request + ": " + response.error );
       }
       else {
         receiveValues(response.result);
@@ -434,8 +464,15 @@ class PerspectivesProxy
     };
     req.reactStateSetter = handleErrors;
     // Move all properties to the default request to ensure we send a complete request.
-    Object.assign(defaultRequest,req);
-    return this.channel.send( defaultRequest );
+    const fullRequest = Object.assign( Object.assign({}, defaultRequest), req);
+
+    // DEVELOPMENT ONLY: warn if any value is undefined
+    if ( Object.values(defaultRequest).includes( undefined ) )
+    {
+      console.warn( "Request misses values: " + JSON.stringify(defaultRequest) );
+    }
+
+    return this.channel.send( fullRequest, fireAndForget );
   }
 
   // unsubscribe from the channel.
@@ -451,54 +488,61 @@ class PerspectivesProxy
   //     receiveValues);
   // }
 
-  getRol (contextID, rolName, receiveValues)
+  getRol (contextID, rolName, receiveValues, fireAndForget)
   {
     return this.send(
       {request: "GetRol", subject: contextID, predicate: rolName},
-      receiveValues);
+      receiveValues,
+      fireAndForget);
   }
 
-  getUnqualifiedRol (contextID, localRolName, receiveValues)
+  getUnqualifiedRol (contextID, localRolName, receiveValues, fireAndForget)
   {
     return this.send(
       {request: "GetUnqualifiedRol", subject: contextID, predicate: localRolName},
-      receiveValues);
+      receiveValues,
+      fireAndForget);
   }
 
-  getProperty (rolID, propertyName, roleType, receiveValues)
+  getProperty (rolID, propertyName, roleType, receiveValues, fireAndForget)
   {
     return this.send(
       {request: "GetProperty", subject: rolID, predicate: propertyName, object: roleType},
-      receiveValues);
+      receiveValues,
+      fireAndForget);
   }
 
-  getPropertyFromLocalName (rolID, propertyName, roleType, receiveValues)
+  getPropertyFromLocalName (rolID, propertyName, roleType, receiveValues, fireAndForget)
   {
     return this.send(
       {request: "GetPropertyFromLocalName", subject: rolID, predicate: propertyName, object: roleType},
-      receiveValues
+      receiveValues,
+      fireAndForget
     );
   }
 
-  getBinding (rolID, receiveValues)
+  getBinding (rolID, receiveValues, fireAndForget)
   {
     return this.send(
       {request: "GetBinding", subject: rolID, predicate: ""},
-      receiveValues);
+      receiveValues,
+      fireAndForget);
   }
 
-  getBindingType (rolID, receiveValues)
+  getBindingType (rolID, receiveValues, fireAndForget)
   {
     return this.send(
       {request: "GetBindingType", subject: rolID, predicate: ""},
-      receiveValues);
+      receiveValues,
+      fireAndForget);
   }
 
-  getRoleBinders (rolID, roleType, receiveValues)
+  getRoleBinders (rolID, roleType, receiveValues, fireAndForget)
   {
     return this.send(
       {request: "GetRoleBinders", subject: rolID, predicate: roleType},
-      receiveValues);
+      receiveValues,
+      fireAndForget);
   }
 
   // getUnqualifiedRoleBinders (rolID, localRolName, receiveValues)
@@ -508,72 +552,82 @@ class PerspectivesProxy
   //     receiveValues);
   // }
 
-  getViewProperties (rolType, viewName, receiveValues)
+  getViewProperties (rolType, viewName, receiveValues, fireAndForget)
   {
     return this.send(
       {request: "GetViewProperties", subject: rolType, predicate: viewName},
-      receiveValues);
+      receiveValues,
+      fireAndForget);
   }
 
-  getRolContext (rolID, receiveValues)
+  getRolContext (rolID, receiveValues, fireAndForget)
   {
     return this.send(
       {request: "GetRolContext", subject: rolID, predicate: ""},
-      receiveValues);
+      receiveValues,
+      fireAndForget);
   }
 
-  getContextType (contextID, receiveValues)
+  getContextType (contextID, receiveValues, fireAndForget)
   {
     return this.send(
       {request: "GetContextType", subject: contextID, predicate: ""},
-      receiveValues);
+      receiveValues,
+      fireAndForget);
   }
 
-  getRolType (rolID, receiveValues)
+  getRolType (rolID, receiveValues, fireAndForget)
   {
     return this.send(
       {request: "GetRolType", subject: rolID, predicate: ""},
-      receiveValues);
+      receiveValues,
+      fireAndForget);
   }
 
-  getRoleKind (rolID, receiveValues)
+  // RoleInContext | ContextRole | ExternalRole | UserRole | BotRole
+  getRoleKind (rolID, receiveValues, fireAndForget)
   {
     return this.send(
       {request: "GetRoleKind", subject: rolID, predicate: ""},
-      receiveValues);
+      receiveValues,
+      fireAndForget);
   }
 
-  getUnqualifiedRolType (contextType, localRolName, receiveValues)
+  getUnqualifiedRolType (contextType, localRolName, receiveValues, fireAndForget)
   {
     return this.send(
       {request: "GetUnqualifiedRolType", subject: contextType, predicate: localRolName},
-      receiveValues);
+      receiveValues,
+      fireAndForget);
   }
 
   // Returns an array of Role Types.
-  getMeForContext (externalRoleInstance, receiveValues)
+  getMeForContext (externalRoleInstance, receiveValues, fireAndForget)
   {
     return this.send(
       {request: "GetMeForContext", subject: externalRoleInstance},
-      receiveValues
+      receiveValues,
+      fireAndForget
     );
   }
 
-  getUserIdentifier (receiveValues)
+  getUserIdentifier (receiveValues, fireAndForget)
   {
     return this.send(
       {request: "GetUserIdentifier"},
-      receiveValues
+      receiveValues,
+      fireAndForget
     );
   }
 
-  getLocalRoleSpecialisation( localAspectName, contextInstance, receiveValues )
+  getLocalRoleSpecialisation( localAspectName, contextInstance, receiveValues, fireAndForget )
   {
     return this.send(
       { request: "GetLocalRoleSpecialisation"
       , subject: contextInstance
       , predicate: localAspectName},
-      receiveValues
+      receiveValues,
+      fireAndForget
     );
   }
 
@@ -734,7 +788,8 @@ module.exports = {
   createRequestEmitterImpl: createRequestEmitterImpl,
   // createTcpConnectionToPerspectives: createTcpConnectionToPerspectives,
   // createServiceWorkerConnectionToPerspectives: createServiceWorkerConnectionToPerspectives,
-  configurePDRproxy: configurePDRproxy
+  configurePDRproxy: configurePDRproxy,
+  FIREANDFORGET: true
 };
 
 ////////////////////////////////////////////////////////////////////////////////
