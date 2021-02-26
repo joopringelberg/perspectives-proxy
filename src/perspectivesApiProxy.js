@@ -287,18 +287,13 @@ class SharedWorkerChannel
           // {serviceWorkerMessage: "isUserLoggedIn", isUserLoggedIn, b} where b is a boolean.
           this.valueReceivers.isUserLoggedIn( e.data.isUserLoggedIn );
           break;
-        case "authenticate":
-          // {serviceWorkerMessage: "authenticate", authenticationResult, n} where n is an integer.
-          // data AuthenticationResult = UnknownUser | WrongCredentials | OK CouchdbUser
-          // UnknownUser = 0
-          // WrongCredentials = 1
-          // OK CouchdbUser = 2
-          this.valueReceivers.authenticate( e.data.authenticationResult );
-          break;
-
         case "resetAccount":
           // {serviceWorkerMessage: "resetAccount", resetSuccesful: b} where b is a boolean.
           this.valueReceivers.resetAccount( e.data.resetSuccesful );
+          break;
+        case "runPDR":
+          // {serviceWorkerMessage: "runPDR", error: e }
+          this.valueReceivers.runPDR( e.error );
           break;
       }
     }
@@ -321,30 +316,28 @@ class SharedWorkerChannel
     );
   }
 
-  // Returns a promise for an integer value:
-  // UnknownUser = 0
-  // WrongCredentials = 1
-  // OK CouchdbUser = 2
-  authenticate (username, password, host, port, publicRepo)
+  // runPDR :: UserName -> Password -> PouchdbUser -> Url -> Effect Unit
+  // Runs the PDR, if a value is returned it will be an error message.
+  runPDR (username, password, pouchdbuser, publicrepo)
   {
     const proxy = this;
-    proxy.channelId.then( channelId => this.port.postMessage( {proxyRequest: "authenticate", username: username, password: password, host: host, port: port, channelId, publicRepo } ));
+    proxy.channelId.then( channelId => this.port.postMessage({proxyRequest: "runPDR", username, password, pouchdbuser, publicrepo, channelId }));
     return new Promise(
-      function(resolver/*, rejecter*/)
+      function(/*resolver,*/ rejecter)
       {
-        proxy.valueReceivers.authenticate = function(result)
+        proxy.valueReceivers.runPDR = function( errormessage )
           {
-            proxy.valueReceivers.authenticate = undefined;
-            resolver( result );
+            proxy.valueReceivers.runPDR = undefined;
+            rejecter( errormessage );
           };
       }
     );
   }
 
-  resetAccount (username, password, host, port, publicRepo)
+  resetAccount (username, password, host, port, publicrepo)
   {
     const proxy = this;
-    proxy.channelId.then( channelId => this.port.postMessage( {proxyRequest: "resetAccount", username: username, password: password, host: host, port: port, channelId, publicRepo } ) );
+    proxy.channelId.then( channelId => this.port.postMessage( {proxyRequest: "resetAccount", username: username, password: password, host: host, port: port, channelId, publicrepo } ) );
     return new Promise(
       function(resolver/*, rejecter*/)
       {
