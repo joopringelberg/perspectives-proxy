@@ -303,8 +303,7 @@ class SharedWorkerChannel
   isUserLoggedIn ()
   {
     const proxy = this;
-    proxy.channelId.then( channelId => proxy.port.postMessage( {proxyRequest: "isUserLoggedIn", channelId } ) );
-    return new Promise(
+    const p = new Promise(
       function(resolver/*, rejecter*/)
       {
         proxy.valueReceivers.isUserLoggedIn = function(isLoggedIn)
@@ -313,7 +312,9 @@ class SharedWorkerChannel
             resolver( isLoggedIn );
           };
       }
-    );
+    ); 
+    proxy.channelId.then( channelId => proxy.port.postMessage( {proxyRequest: "isUserLoggedIn", channelId } ) );
+    return p;
   }
 
   // runPDR :: UserName -> Password -> PouchdbUser -> Url -> Effect Unit
@@ -321,8 +322,7 @@ class SharedWorkerChannel
   runPDR (username, password, pouchdbuser, publicrepo)
   {
     const proxy = this;
-    proxy.channelId.then( channelId => this.port.postMessage({proxyRequest: "runPDR", username, password, pouchdbuser, publicrepo, channelId }));
-    return new Promise(
+    const p = new Promise(
       function(/*resolver,*/ rejecter)
       {
         proxy.valueReceivers.runPDR = function( errormessage )
@@ -332,13 +332,14 @@ class SharedWorkerChannel
           };
       }
     );
+    proxy.channelId.then( channelId => this.port.postMessage({proxyRequest: "runPDR", username, password, pouchdbuser, publicrepo, channelId }));
+    return p;
   }
 
   resetAccount (username, password, host, port, publicrepo)
   {
     const proxy = this;
-    proxy.channelId.then( channelId => this.port.postMessage( {proxyRequest: "resetAccount", username: username, password: password, host: host, port: port, channelId, publicrepo } ) );
-    return new Promise(
+    const p = new Promise(
       function(resolver/*, rejecter*/)
       {
         proxy.valueReceivers.resetAccount = function(result)
@@ -348,6 +349,8 @@ class SharedWorkerChannel
           };
       }
     );
+    proxy.channelId.then( channelId => this.port.postMessage( {proxyRequest: "resetAccount", username: username, password: password, host: host, port: port, channelId, publicrepo } ) );
+    return p;
   }
 
   // Inform the server that this client shuts down.
