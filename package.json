@@ -1,6 +1,6 @@
 {
   "name": "perspectives-proxy",
-  "version": "1.8.0",
+  "version": "1.9.0",
   "description": "Exposes perspectives-core either through TCP or a channel based on coroutines for apps with integrated core.",
   "main": "dist/perspectives-proxy.js",
   "scripts": {
