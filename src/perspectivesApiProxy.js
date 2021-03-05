@@ -293,7 +293,7 @@ class SharedWorkerChannel
           break;
         case "runPDR":
           // {serviceWorkerMessage: "runPDR", error: e }
-          this.valueReceivers.runPDR( e.error );
+          this.valueReceivers.runPDR( e );
           break;
       }
     }
@@ -312,23 +312,32 @@ class SharedWorkerChannel
             resolver( isLoggedIn );
           };
       }
-    ); 
+    );
     proxy.channelId.then( channelId => proxy.port.postMessage( {proxyRequest: "isUserLoggedIn", channelId } ) );
     return p;
   }
 
   // runPDR :: UserName -> Password -> PouchdbUser -> Url -> Effect Unit
   // Runs the PDR, if a value is returned it will be an error message.
+  // {serviceWorkerMessage: "runPDR", startSuccesful: success }
+  // {serviceWorkerMessage: "runPDR", error: e }
   runPDR (username, password, pouchdbuser, publicrepo)
   {
     const proxy = this;
     const p = new Promise(
-      function(/*resolver,*/ rejecter)
+      function(resolver, rejecter)
       {
-        proxy.valueReceivers.runPDR = function( errormessage )
+        proxy.valueReceivers.runPDR = function( e )
           {
             proxy.valueReceivers.runPDR = undefined;
-            rejecter( errormessage );
+            if (e.error)
+            {
+              rejecter( e.errormessage );
+            }
+            else
+            {
+              resolver( e.startSuccesful );
+            }
           };
       }
     );
