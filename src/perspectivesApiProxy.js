@@ -345,7 +345,7 @@ class SharedWorkerChannel
     return p;
   }
 
-  resetAccount (username, password, host, port, publicrepo)
+  resetAccount (username, password, pouchdbuser, publicrepo) //(username, password, host, port, publicrepo)
   {
     const proxy = this;
     const p = new Promise(
@@ -358,7 +358,7 @@ class SharedWorkerChannel
           };
       }
     );
-    proxy.channelId.then( channelId => this.port.postMessage( {proxyRequest: "resetAccount", username: username, password: password, host: host, port: port, channelId, publicrepo } ) );
+    proxy.channelId.then( channelId => this.port.postMessage( {proxyRequest: "resetAccount", username, password, pouchdbuser, publicrepo, channelId } ) );
     return p;
   }
 
