@@ -295,6 +295,10 @@ class SharedWorkerChannel
           // {serviceWorkerMessage: "runPDR", error: e }
           this.valueReceivers.runPDR( e );
           break;
+        case "createAccount":
+          // {serviceWorkerMessage: "createAccount", createSuccesful: b} where b is a boolean.
+          this.valueReceivers.createAccount( e.data.createSuccesful );
+          break;
       }
     }
   }
@@ -321,7 +325,7 @@ class SharedWorkerChannel
   // Runs the PDR, if a value is returned it will be an error message.
   // {serviceWorkerMessage: "runPDR", startSuccesful: success }
   // {serviceWorkerMessage: "runPDR", error: e }
-  runPDR (username, password, pouchdbuser, publicrepo)
+  runPDR (username, pouchdbuser, publicrepo)
   {
     const proxy = this;
     const p = new Promise(
@@ -341,11 +345,28 @@ class SharedWorkerChannel
           };
       }
     );
-    proxy.channelId.then( channelId => this.port.postMessage({proxyRequest: "runPDR", username, password, pouchdbuser, publicrepo, channelId }));
+    proxy.channelId.then( channelId => this.port.postMessage({proxyRequest: "runPDR", username, pouchdbuser, publicrepo, channelId }));
     return p;
   }
 
-  resetAccount (username, password, pouchdbuser, publicrepo) //(username, password, host, port, publicrepo)
+  createUser (username, pouchdbuser, publicrepo)
+  {
+    const proxy = this;
+    const p = new Promise(
+      function(resolver/*, rejecter*/)
+      {
+        proxy.valueReceivers.createAccount = function(result)
+          {
+            proxy.valueReceivers.createAccount = undefined;
+            resolver( result );
+          };
+      }
+    );
+    proxy.channelId.then( channelId => this.port.postMessage( {proxyRequest: "createAccount", username, pouchdbuser, publicrepo, channelId } ) );
+    return p;
+  }
+
+  resetAccount (username, pouchdbuser, publicrepo)
   {
     const proxy = this;
     const p = new Promise(
@@ -358,7 +379,7 @@ class SharedWorkerChannel
           };
       }
     );
-    proxy.channelId.then( channelId => this.port.postMessage( {proxyRequest: "resetAccount", username, password, pouchdbuser, publicrepo, channelId } ) );
+    proxy.channelId.then( channelId => this.port.postMessage( {proxyRequest: "resetAccount", username, pouchdbuser, publicrepo, channelId } ) );
     return p;
   }
 
