@@ -37,9 +37,9 @@ The PDRproxy promise is imported by all of the modules in perspectives-react tha
 //// CLIENT SIDE PROMISES
 ////////////////////////////////////////////////////////////////////////////////
 
-let pdrProxyResolver, pdrProxyRejecter;
+let pdrProxyResolver/*, pdrProxyRejecter*/;
 let internalChannelResolver, internalChannelRejecter;
-let sharedWorkerChannelResolver, sharedWorkerChannelRejecter;
+let sharedWorkerChannelResolver/*, sharedWorkerChannelRejecter*/;
 
 // This promise will resolve to an instance of PerspectivesProxy, with an InternalChannel.
 // The proxy uses the channel to actually send requests to the core. These requests will
@@ -47,10 +47,10 @@ let sharedWorkerChannelResolver, sharedWorkerChannelRejecter;
 // The channel uses the emit function as a callback: when it has a request to send, it calls 'emit'
 // after wrapping the request in the appropriate constructor (usually the emitStep).
 const PDRproxy = new Promise(
-  function (resolve, reject)
+  function (resolve/*, reject*/)
   {
     pdrProxyResolver = resolve;
-    pdrProxyRejecter = reject;
+    //pdrProxyRejecter = reject;
   });
 
 // This promise will resolve to an instance of the InternalChannel.
@@ -65,10 +65,10 @@ const InternalChannelPromise = new Promise(
 // This promise will resolve to an instance of the the SharedWorkerChannel.
 // It is used by InPlace, running in the same javascript process as this proxy.
 const SharedWorkerChannelPromise = new Promise(
-  function (resolve, reject)
+  function (resolve/*, reject*/)
   {
     sharedWorkerChannelResolver = resolve;
-    sharedWorkerChannelRejecter = reject;
+    // sharedWorkerChannelRejecter = reject;
   });
 
 ////////////////////////////////////////////////////////////////////////////////
@@ -291,6 +291,10 @@ class SharedWorkerChannel
           // {serviceWorkerMessage: "resetAccount", resetSuccesful: b} where b is a boolean.
           this.valueReceivers.resetAccount( e.data.resetSuccesful );
           break;
+        case "removeAccount":
+          // {serviceWorkerMessage: "removeAccount", removeSuccesful: b} where b is a boolean.
+          this.valueReceivers.removeAccount( e.data.removeSuccesful );
+          break;
         case "runPDR":
           // {serviceWorkerMessage: "runPDR", error: e }
           this.valueReceivers.runPDR( e );
@@ -380,6 +384,23 @@ class SharedWorkerChannel
       }
     );
     proxy.channelId.then( channelId => this.port.postMessage( {proxyRequest: "resetAccount", username, pouchdbuser, publicrepo, channelId } ) );
+    return p;
+  }
+
+  removeAccount (username, pouchdbuser, publicrepo)
+  {
+    const proxy = this;
+    const p = new Promise(
+      function(resolver/*, rejecter*/)
+      {
+        proxy.valueReceivers.removeAccount = function(result)
+          {
+            proxy.valueReceivers.removeAccount = undefined;
+            resolver( result );
+          };
+      }
+    );
+    proxy.channelId.then( channelId => this.port.postMessage( {proxyRequest: "removeAccount", username, pouchdbuser, publicrepo, channelId } ) );
     return p;
   }
 
