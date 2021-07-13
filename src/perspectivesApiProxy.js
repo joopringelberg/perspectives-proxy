@@ -534,7 +534,7 @@ class PerspectivesProxy
   //     {request: "GetRolBinding", subject: contextID, predicate: rolName},
   //     receiveValues);
   // }
-
+  // rolName must be qualified but may use default prefixes.
   getRol (contextID, rolName, receiveValues, fireAndForget)
   {
     return this.send(
@@ -679,7 +679,11 @@ class PerspectivesProxy
   }
 
   // Create a context, bound to a new instance of <roleType> in <contextId>. <roleType> may be a local name.
-  // createContext( <contextDescription>, <roleType>, <contextId>, <EmbeddingContextType>, ...)
+  // The ctype in the contextDescription must be qualified, but it may use a default prefix.
+  // createContext( <contextDescription>, <roleType>, <contextId>, <EmbeddingContextType>, <myRoleType> ...)
+  // roleType may be a name local to the EmbeddingContextType.
+  // EmbeddingContextType must be fully qualified.
+  // contextId must be a valid identifier for the context to create. Default namespaces will be expanded (e.g. usr:)
   // Either throws an error, or returns an array with
   //  - just a single string identifiying the external role of a DBQ role;
   //  - that string and a second that identifies the new context role otherwise.
