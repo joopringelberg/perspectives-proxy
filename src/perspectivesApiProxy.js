@@ -284,7 +284,7 @@ class SharedWorkerChannel
           this.channelIdResolver( e.data.channelId );
           break;
         case "isUserLoggedIn":
-          // {serviceWorkerMessage: "isUserLoggedIn", isUserLoggedIn, b} where b is a boolean.
+          // {serviceWorkerMessage: "isUserLoggedIn", isUserLoggedIn: b} where b is a boolean.
           this.valueReceivers.isUserLoggedIn( e.data.isUserLoggedIn );
           break;
         case "resetAccount":
@@ -658,6 +658,16 @@ class PerspectivesProxy
     );
   }
 
+  // NOTE: it is not possible to subscribe to update events on this query.
+  getAllMyRoleTypes(externalRoleInstance, receiveValues)
+  {
+    return this.send(
+      {request: "GetAllMyRoleTypes", subject: externalRoleInstance},
+      receiveValues,
+      true
+    );
+  }
+
   getUserIdentifier (receiveValues, fireAndForget)
   {
     return this.send(
@@ -815,6 +825,15 @@ class PerspectivesProxy
     );
   }
 
+  setPreferredUserRoleType( externalRoleId, userRoleName )
+  {
+    this.send(
+      {request: "SetPreferredUserRoleType", subject: externalRoleId, object: userRoleName},
+      function(){}
+    );
+  }
+
+  // NOTE: this function returns a promise and does not take a callback!
   matchContextName( name )
   {
     const proxy = this;
@@ -825,6 +844,22 @@ class PerspectivesProxy
           function(qualifiedNames)
           {
             resolver( qualifiedNames );
+          }
+        );
+      });
+  }
+
+  // NOTE: this function returns a promise and does not take a callback!
+  getCouchdbUrl()
+  {
+    const proxy = this;
+    return new Promise(function (resolver)
+      {
+        proxy.send(
+          { request: "GetCouchdbUrl" },
+          function( url )
+          {
+            resolver( url );
           }
         );
       });
