@@ -677,6 +677,35 @@ class PerspectivesProxy
     );
   }
 
+  getPerspectives (contextInstance, userRoleType, receiveValues, fireAndForget)
+  {
+    return this.send(
+      { request: "GetPerspectives"
+      , subject: userRoleType
+      , object: contextInstance
+      },
+      function (perspectiveStrings)
+      {
+        return receiveValues(perspectiveStrings.map( JSON.parse ));
+      },
+      fireAndForget
+    );
+  }
+
+  getRolesWithProperties (contextInstance, roleType, receiveValues, fireAndForget)
+  {
+    return this.send(
+      { request: "GetRolesWithProperties"
+      , object: contextInstance
+      , predicate: roleType },
+      function (roleWithPropertiesStrings)
+      {
+        return receiveValues( roleWithPropertiesStrings.map (JSON.parse ) );
+      },
+      fireAndForget
+    );
+  }
+
   getLocalRoleSpecialisation( localAspectName, contextInstance, receiveValues, fireAndForget )
   {
     return this.send(
