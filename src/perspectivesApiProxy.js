@@ -291,6 +291,10 @@ class SharedWorkerChannel
           // {serviceWorkerMessage: "resetAccount", resetSuccesful: b} where b is a boolean.
           this.valueReceivers.resetAccount( e.data.resetSuccesful );
           break;
+        case "recompileBasicModels":
+          // {serviceWorkerMessage: "recompileBasicModels", recompileSuccesful: b} where b is a boolean.
+          this.valueReceivers.recompileBasicModels( e.data.recompileSuccesful );
+          break;
         case "removeAccount":
           // {serviceWorkerMessage: "removeAccount", removeSuccesful: b} where b is a boolean.
           this.valueReceivers.removeAccount( e.data.removeSuccesful );
@@ -384,6 +388,23 @@ class SharedWorkerChannel
       }
     );
     proxy.channelId.then( channelId => this.port.postMessage( {proxyRequest: "resetAccount", username, pouchdbuser, publicrepo, channelId } ) );
+    return p;
+  }
+
+  recompileBasicModels (pouchdbuser, publicrepo)
+  {
+    const proxy = this;
+    const p = new Promise(
+      function(resolver/*, rejecter*/)
+      {
+        proxy.valueReceivers.recompileBasicModels = function(result)
+          {
+            proxy.valueReceivers.recompileBasicModels = undefined;
+            resolver( result );
+          };
+      }
+    );
+    proxy.channelId.then( channelId => this.port.postMessage( {proxyRequest: "recompileBasicModels", pouchdbuser, publicrepo, channelId } ) );
     return p;
   }
 
@@ -668,6 +689,7 @@ class PerspectivesProxy
     );
   }
 
+  // The instance of model:System$PerspectivesSystem$User that represents the user operating this PDR.
   getUserIdentifier (receiveValues, fireAndForget)
   {
     return this.send(
@@ -791,6 +813,27 @@ class PerspectivesProxy
     this.send(
       {request: "DeleteProperty", subject: rolID, predicate: propertyName, authoringRole: myroletype},
       function() {}
+    );
+  }
+
+  // { request: Action
+  //   , predicate: <object of perspective role instance>
+  //   , object: <context instance>
+  //   , contextDescription:
+  //   	  { perspectiveId:
+  //   	  , actionName:
+  //   	  }
+  //   , authoringRole
+  //   ...}
+  action (objectRoleInstance, contextInstance, perspectiveId, actionName, authoringRole)
+  {
+    this.send(
+      { request: "Action"
+      , predicate: objectRoleInstance
+      , object: contextInstance
+      , contextDescription: { perspectiveId, actionName }
+      , authoringRole
+      }
     );
   }
 
