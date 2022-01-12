@@ -827,14 +827,36 @@ class PerspectivesProxy
   //   ...}
   action (objectRoleInstance, contextInstance, perspectiveId, actionName, authoringRole)
   {
-    this.send(
-      { request: "Action"
+    const req = { request: "Action"
       , predicate: objectRoleInstance
       , object: contextInstance
       , contextDescription: { perspectiveId, actionName }
       , authoringRole
-      }
-    );
+      };
+    if (objectRoleInstance)
+    {
+      req.predicate = objectRoleInstance;
+    }
+    this.send( req );
+  }
+
+  // { request: ContextAction
+  // , subject: RoleType // the user role type
+  // , predicate: String // action identifier
+  // , object: ContextId
+  // }
+  contextAction( contextid, myRoleType, actionName)
+  {
+    this.send({request: "ContextAction", subject: myRoleType, predicate: actionName, object: contextid });
+  }
+
+  // { request: GetContextActions
+  // , subject: RoleType // the user role type
+  // , object: ContextInstance
+  // }
+  getContextActions(myRoleType, contextInstance, receiveValues)
+  {
+    this.send({ request: "GetContextActions", subject: myRoleType, object: contextInstance }, receiveValues);
   }
 
   removeBinding (rolID, bindingID, myroletype)
@@ -878,7 +900,8 @@ class PerspectivesProxy
     );
   }
 
-  // checkBinding( <contexttype>, <localRolName>, <binding>, [() -> undefined] )
+  // checkBinding( <contexttype>, <(local)RolName>, <binding>, [() -> undefined] )
+  // Where (local)RolName identifies the role in <contexttype> whose binding specification we want to compare with <binding>.
   checkBinding (contextType, localRolName, rolInstance, callback)
   {
     this.send(
@@ -935,6 +958,16 @@ class PerspectivesProxy
           }
         );
       });
+  }
+
+  getRoleName( rid, receiveValues )
+  {
+    this.send(
+      { request: "GetRoleName"
+      , object: rid
+      }
+      , receiveValues
+    );
   }
 
 }
