@@ -714,6 +714,23 @@ class PerspectivesProxy
     );
   }
 
+  // { request: "GetPerspective", subject: UserRoleType OPTIONAL, predicate: RoleInstance, object: ContextInstance OPTIONAL }
+  getPerspective (contextInstance/*optional*/, userRoleType/*optional*/, roleInstance, receiveValues, fireAndForget)
+  {
+    return this.send(
+      { request: "GetPerspective"
+      , subject: userRoleType
+      , predicate: roleInstance
+      , object: contextInstance
+      },
+      function (perspectiveStrings)
+      {
+        return receiveValues(perspectiveStrings.map( JSON.parse ));
+      },
+      fireAndForget
+    );
+  }
+
   getRolesWithProperties (contextInstance, roleType, receiveValues, fireAndForget)
   {
     return this.send(
@@ -867,19 +884,20 @@ class PerspectivesProxy
     );
   }
 
-  removeRol (contextType, rolName, rolID, myroletype)
+  removeRol (rolName, rolID, myroletype)
   {
     this.send(
-      {request: "RemoveRol", subject: rolID, predicate: rolName, object: contextType, authoringRole: myroletype},
+      {request: "RemoveRol", subject: rolID, predicate: rolName, authoringRole: myroletype},
       function() {}
     );
   }
 
-  //{request: "RemoveContext", subject: rolID, predicate: rolName, object: contextType, authoringRole: myroletype}
-  removeContext (rolID, rolName, contextType, myroletype)
+  //{request: "RemoveContext", subject: rolID, predicate: rolName, authoringRole: myroletype}
+  // rolName must be qualified.
+  removeContext (rolID, rolName, myroletype)
   {
     this.send(
-      {request: "RemoveContext", subject: rolID, predicate: rolName, object: contextType, authoringRole: myroletype},
+      {request: "RemoveContext", subject: rolID, predicate: rolName, authoringRole: myroletype},
       function(){});
   }
 
