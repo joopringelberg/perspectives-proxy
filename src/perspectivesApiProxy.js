@@ -875,6 +875,14 @@ class PerspectivesProxy
     );
   }
 
+  //{request: "RemoveContext", subject: rolID, predicate: rolName, object: contextType, authoringRole: myroletype}
+  removeContext (rolID, rolName, contextType, myroletype)
+  {
+    this.send(
+      {request: "RemoveContext", subject: rolID, predicate: rolName, object: contextType, authoringRole: myroletype},
+      function(){});
+  }
+
   deleteRole (contextID, rolName, rolID, myroletype)
   {
     this.send(
