@@ -884,21 +884,22 @@ class PerspectivesProxy
     );
   }
 
-  removeRol (rolName, rolID, myroletype)
+  removeRol (rolName, rolID, myroletype, callback)
   {
     this.send(
       {request: "RemoveRol", subject: rolID, predicate: rolName, authoringRole: myroletype},
-      function() {}
+      (callback ? callback : function(){})
     );
   }
 
   //{request: "RemoveContext", subject: rolID, predicate: rolName, authoringRole: myroletype}
   // rolName must be qualified.
-  removeContext (rolID, rolName, myroletype)
+  removeContext (rolID, rolName, myroletype, callback)
   {
     this.send(
       {request: "RemoveContext", subject: rolID, predicate: rolName, authoringRole: myroletype},
-      function(){});
+      (callback ? callback : function(){})
+    );
   }
 
   deleteRole (contextID, rolName, rolID, myroletype)
