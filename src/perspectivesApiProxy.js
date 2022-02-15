@@ -605,10 +605,13 @@ class PerspectivesProxy
       fireAndForget);
   }
 
-  getRoleBinders (rolID, roleType, receiveValues, fireAndForget)
+  // Note: this function is currently not in use.
+  // The lexical context of the roleType can be used by providing the empty string
+  // as argument for parameter contextType.
+  getRoleBinders (rolID, contextType, roleType, receiveValues, fireAndForget)
   {
     return this.send(
-      {request: "GetRoleBinders", subject: rolID, predicate: roleType},
+      {request: "GetRoleBinders", subject: rolID, predicate: roleType, object: contextType},
       receiveValues,
       fireAndForget);
   }
