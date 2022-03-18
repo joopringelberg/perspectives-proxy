@@ -734,6 +734,22 @@ class PerspectivesProxy
     );
   }
 
+  // { request: "GetScreen", subject: UserRoleType, object: ContextInstance }
+  getScreen(userRoleType, contextInstance, receiveValues, fireAndForget)
+  {
+    return this.send(
+      { request: "GetScreen"
+      , subject: userRoleType
+      , object: contextInstance
+      },
+      function (screenStrings)
+      {
+        return receiveValues(screenStrings.map( JSON.parse ));
+      },
+      fireAndForget
+    );
+  }
+
   getRolesWithProperties (contextInstance, roleType, receiveValues, fireAndForget)
   {
     return this.send(
