@@ -522,7 +522,7 @@ class PerspectivesProxy
     {
       if (response.error)
       {
-        console.warn( defaultRequest.request + ": " + response.error );
+        console.warn( "This request:\n" + req + "\n results in this error: \n" + response.error );
       }
       else {
         receiveValues(response.result);
@@ -734,12 +734,13 @@ class PerspectivesProxy
     );
   }
 
-  // { request: "GetScreen", subject: UserRoleType, object: ContextInstance }
-  getScreen(userRoleType, contextInstance, receiveValues, fireAndForget)
+  // { request: "GetScreen", subject: UserRoleType, predicate: ContextType, object: ContextInstance }
+  getScreen(userRoleType, contextInstance, contextType, receiveValues, fireAndForget)
   {
     return this.send(
       { request: "GetScreen"
       , subject: userRoleType
+      , predicate: contextType
       , object: contextInstance
       },
       function (screenStrings)
