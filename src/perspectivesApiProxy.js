@@ -837,12 +837,29 @@ class PerspectivesProxy
   }
 
   // value is just a single string!
-  setProperty (rolID, propertyName, value, myroletype)
+  setProperty (rolID, propertyName, value, myroletype, callback)
   {
     this.send(
       {request: "SetProperty", subject: rolID, predicate: propertyName, object: value, authoringRole: myroletype},
-      function() {}
+      callback || function() {}
     );
+  }
+
+  // Function returns a promise.
+  setPropertyP (rolID, propertyName, value, myroletype)
+  {
+    const proxy = this;
+    return new Promise(function(resolver)
+      {
+        proxy.send(
+          {request: "SetProperty", subject: rolID, predicate: propertyName, object: value, authoringRole: myroletype},
+          function(whatever)
+          {
+            resolver( whatever );
+          }
+        );
+      });
+
   }
 
   deleteProperty (rolID, propertyName, myroletype)
