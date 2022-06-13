@@ -776,6 +776,17 @@ class PerspectivesProxy
     );
   }
 
+  getRoleName( rid, receiveValues, fireAndForget )
+  {
+    this.send(
+      { request: "GetRoleName"
+      , object: rid
+      }
+      , receiveValues
+      , fireAndForget
+    );
+  }
+
   // Create a context, bound to a new instance of <roleType> in <contextId>. <roleType> may be a local name.
   // The ctype in the contextDescription must be qualified, but it may use a default prefix.
   // createContext( <contextDescription>, <roleType>, <contextId>, <EmbeddingContextType>, <myRoleType> ...)
@@ -1022,16 +1033,6 @@ class PerspectivesProxy
           }
         );
       });
-  }
-
-  getRoleName( rid, receiveValues )
-  {
-    this.send(
-      { request: "GetRoleName"
-      , object: rid
-      }
-      , receiveValues
-    );
   }
 
 }
