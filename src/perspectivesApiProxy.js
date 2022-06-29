@@ -522,7 +522,7 @@ class PerspectivesProxy
     {
       if (response.error)
       {
-        console.warn( "This request:\n" + req + "\n results in this error: \n" + response.error );
+        console.warn( "This request:\n" + JSON.stringify(req) + "\n results in this error: \n" + response.error );
       }
       else {
         receiveValues(response.result);
