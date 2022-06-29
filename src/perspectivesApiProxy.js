@@ -977,11 +977,12 @@ class PerspectivesProxy
 
   // checkBinding( <contexttype>, <(local)RolName>, <binding>, [() -> undefined] )
   // Where (local)RolName identifies the role in <contexttype> whose binding specification we want to compare with <binding>.
-  checkBinding (contextType, localRolName, rolInstance, callback)
+  checkBinding (contextType, localRolName, rolInstance, callback, fireAndForget)
   {
     this.send(
       {request: "CheckBinding", subject: contextType, predicate: localRolName, object: rolInstance}
       , callback
+      , fireAndForget
     );
   }
 
