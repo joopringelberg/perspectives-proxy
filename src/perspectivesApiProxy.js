@@ -912,7 +912,7 @@ class PerspectivesProxy
   // }
   contextAction( contextid, myRoleType, actionName)
   {
-    this.send({request: "ContextAction", subject: myRoleType, predicate: actionName, object: contextid });
+    this.send({request: "ContextAction", subject: myRoleType, predicate: actionName, object: contextid, authoringRole: myRoleType });
   }
 
   // { request: GetContextActions
@@ -924,7 +924,7 @@ class PerspectivesProxy
     this.send({ request: "GetContextActions", subject: myRoleType, object: contextInstance }, receiveValues);
   }
 
-  removeBinding (rolID, bindingID, myroletype)
+  removeBinding (rolID, myroletype)
   {
     this.send(
       {request: "RemoveBinding", subject: rolID, authoringRole: myroletype},
@@ -950,6 +950,7 @@ class PerspectivesProxy
     );
   }
 
+  // Currently not used!
   deleteRole (contextID, rolName, rolID, myroletype)
   {
     this.send(
