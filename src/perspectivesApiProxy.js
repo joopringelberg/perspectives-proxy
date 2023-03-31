@@ -157,7 +157,8 @@ const defaultRequest =
     object: "",
     reactStateSetter: function(){},
     corrId: "",
-    contextDescription: {}
+    contextDescription: {},
+    onlyOnce: false
   };
 
 
@@ -210,7 +211,7 @@ class InternalChannel
       req.corrId = this.nextRequestId();
     }
     // console.log( req );
-    if (fireAndForget)
+    if (fireAndForget && !req.onlyOnce)
     {
       // This duplicates the functionality in the SharedWorkerChannel. However, when calls are routed from the client
       // through the SharedWorkerChannel, this InternalChannel lives on the PDR side of the Channel Messaging API and
@@ -491,7 +492,7 @@ class SharedWorkerChannel
           req.corrId = reqId;
         }
         // Store the valueReceiver.
-        if (fireAndForget)
+        if (fireAndForget && !req.onlyOnce)
         {
           // This is a once-only request, so we construct a valueReceiver
           // that sends an Unsubscribe request to the proxy.
@@ -814,7 +815,7 @@ class PerspectivesProxy
     return new Promise(function(resolver, rejecter)
       {
         proxy.send(
-          {request: "CheckBinding", subject: contextType, predicate: localRolName, object: rolInstance}
+          {request: "CheckBinding", subject: contextType, predicate: localRolName, object: rolInstance, onlyOnce: true}
           , resolver
           , FIREANDFORGET
           , rejecter
@@ -829,7 +830,7 @@ class PerspectivesProxy
     return new Promise(function(resolver, rejecter)
       {
         proxy.send(
-          {request: "MatchContextName", subject: name},
+          {request: "MatchContextName", subject: name, onlyOnce: true},
           function(qualifiedNames)
           {
             resolver( qualifiedNames );
@@ -846,7 +847,7 @@ class PerspectivesProxy
     return new Promise(function (resolver, rejecter)
       {
         proxy.send(
-          { request: "GetCouchdbUrl" },
+          { request: "GetCouchdbUrl", onlyOnce: true },
           function( url )
           {
             resolver( url );
@@ -866,7 +867,7 @@ class PerspectivesProxy
     const proxy = this;
     return new Promise(function (resolver, rejecter)
     {
-      proxy.send({ request: "GetContextActions", subject: myRoleType, object: contextInstance }, 
+      proxy.send({ request: "GetContextActions", subject: myRoleType, object: contextInstance, onlyOnce: true }, 
       resolver,
       FIREANDFORGET,
       rejecter
@@ -880,7 +881,7 @@ class PerspectivesProxy
     return new Promise(function (resolver, rejecter)
       {
         return proxy.send(
-          {request: "GetAllMyRoleTypes", subject: externalRoleInstance},
+          {request: "GetAllMyRoleTypes", subject: externalRoleInstance, onlyOnce: true},
           resolver,
           FIREANDFORGET, 
           rejecter
@@ -894,7 +895,7 @@ class PerspectivesProxy
     return new Promise(function (resolver, rejecter)
       {
         return proxy.send(
-          {request: "GetViewProperties", subject: rolType, predicate: viewName},
+          {request: "GetViewProperties", subject: rolType, predicate: viewName, onlyOnce: true},
           resolver,
           FIREANDFORGET, 
           rejecter);
@@ -907,7 +908,7 @@ class PerspectivesProxy
     return new Promise(function (resolver, rejecter)
       {
         return proxy.send(
-          {request: "GetContextType", subject: contextID, predicate: ""},
+          {request: "GetContextType", subject: contextID, predicate: "", onlyOnce: true},
           resolver,
           FIREANDFORGET, 
           rejecter);
@@ -920,7 +921,7 @@ class PerspectivesProxy
     return new Promise(function (resolver, rejecter)
       {
         return proxy.send(
-        {request: "GetRolContext", subject: rolID, predicate: ""},
+        {request: "GetRolContext", subject: rolID, predicate: "", onlyOnce: true},
         resolver,
         FIREANDFORGET,
         rejecter);
@@ -933,7 +934,7 @@ class PerspectivesProxy
     return new Promise(function (resolver, rejecter)
       {
         return proxy.send(
-          {request: "GetRolType", subject: rolID, predicate: ""},
+          {request: "GetRolType", subject: rolID, predicate: "", onlyOnce: true},
           resolver,
           FIREANDFORGET, 
           rejecter);
@@ -947,7 +948,7 @@ class PerspectivesProxy
     return new Promise(function (resolver, rejecter)
       {
         return proxy.send(
-          {request: "GetRoleKind", subject: rolID, predicate: ""},
+          {request: "GetRoleKind", subject: rolID, predicate: "", onlyOnce: true},
           resolver,
           FIREANDFORGET, 
           rejecter);
@@ -960,7 +961,7 @@ class PerspectivesProxy
     return new Promise(function (resolver, rejecter)
       {
         return proxy.send(
-          {request: "GetUnqualifiedRolType", subject: contextType, predicate: localRolName},
+          {request: "GetUnqualifiedRolType", subject: contextType, predicate: localRolName, onlyOnce: true},
           resolver,
           FIREANDFORGET, 
           rejecter);
@@ -990,7 +991,7 @@ class PerspectivesProxy
     return new Promise(function (resolver, rejecter)
       {
         return proxy.send(
-          {request: "CreateContext", subject: contextId, predicate: roleType, object: embeddingContextType, contextDescription: contextDescription, authoringRole: myroletype},
+          {request: "CreateContext", subject: contextId, predicate: roleType, object: embeddingContextType, contextDescription: contextDescription, authoringRole: myroletype, onlyOnce: true},
           resolver,
           FIREANDFORGET,
           rejecter
@@ -1007,7 +1008,7 @@ class PerspectivesProxy
     return new Promise(function (resolver, rejecter)
       {
         return proxy.send(
-          {request: "CreateContext_", subject: roleInstance, contextDescription: contextDescription, authoringRole: myroletype},
+          {request: "CreateContext_", subject: roleInstance, contextDescription: contextDescription, authoringRole: myroletype, onlyOnce: true},
           resolver, 
           FIREANDFORGET,
           rejecter
@@ -1022,7 +1023,7 @@ class PerspectivesProxy
     return new Promise(function (resolver, rejecter)
       {
         return proxy.send(
-          {request: "ImportContexts", contextDescription: contextDescription},
+          {request: "ImportContexts", contextDescription: contextDescription, onlyOnce: true},
           resolver, 
           FIREANDFORGET,
           rejecter
@@ -1038,7 +1039,7 @@ class PerspectivesProxy
     return new Promise(function (resolver, rejecter)
       {
         return proxy.send(
-          {request: "ImportTransaction", contextDescription: transaction},
+          {request: "ImportTransaction", contextDescription: transaction, onlyOnce: true},
           resolver, 
           FIREANDFORGET,
           rejecter
@@ -1053,7 +1054,7 @@ class PerspectivesProxy
     return new Promise(function (resolver, rejecter)
       {
         return proxy.send(
-          {request: "SetProperty", subject: rolID, predicate: propertyName, object: value, authoringRole: myroletype}
+          {request: "SetProperty", subject: rolID, predicate: propertyName, object: value, authoringRole: myroletype, onlyOnce: true}
           , resolver
           , FIREANDFORGET
           , rejecter
@@ -1067,7 +1068,7 @@ class PerspectivesProxy
     return new Promise(function (resolver, rejecter)
       {
         return proxy.send(
-          {request: "DeleteProperty", subject: rolID, predicate: propertyName, authoringRole: myroletype},
+          {request: "DeleteProperty", subject: rolID, predicate: propertyName, authoringRole: myroletype, onlyOnce: true},
           resolver, 
           FIREANDFORGET,
           rejecter
@@ -1092,6 +1093,7 @@ class PerspectivesProxy
       , object: contextInstance
       , contextDescription: { perspectiveId, actionName }
       , authoringRole
+      , onlyOnce: true
       };
     if (objectRoleInstance)
     {
@@ -1118,7 +1120,7 @@ class PerspectivesProxy
     return new Promise(function (resolver, rejecter)
       {
         return proxy.send(
-        {request: "ContextAction", subject: myRoleType, predicate: actionName, object: contextid, authoringRole: myRoleType },
+        {request: "ContextAction", subject: myRoleType, predicate: actionName, object: contextid, authoringRole: myRoleType, onlyOnce: true },
         resolver,
         FIREANDFORGET,
         rejecter)
@@ -1131,7 +1133,7 @@ class PerspectivesProxy
     return new Promise(function (resolver, rejecter)
       {
         return proxy.send(
-          {request: "RemoveBinding", subject: rolID, authoringRole: myroletype},
+          {request: "RemoveBinding", subject: rolID, authoringRole: myroletype, onlyOnce: true},
           resolver,
           FIREANDFORGET,
           rejecter
@@ -1145,7 +1147,7 @@ class PerspectivesProxy
     return new Promise(function (resolver, rejecter)
       {
         return proxy.send(
-          {request: "RemoveRol", subject: rolID, predicate: rolName, authoringRole: myroletype},
+          {request: "RemoveRol", subject: rolID, predicate: rolName, authoringRole: myroletype, onlyOnce: true},
           resolver,
           FIREANDFORGET,
           rejecter
@@ -1161,7 +1163,7 @@ class PerspectivesProxy
     return new Promise(function (resolver, rejecter)
       {
         return proxy.send(
-          {request: "RemoveContext", subject: rolID, predicate: rolName, authoringRole: myroletype},
+          {request: "RemoveContext", subject: rolID, predicate: rolName, authoringRole: myroletype, onlyOnce: true},
           resolver,
           FIREANDFORGET,
           rejecter
@@ -1176,7 +1178,7 @@ class PerspectivesProxy
     return new Promise(function (resolver, rejecter)
       {
         return proxy.send(
-          {request: "DeleteRole", subject: rolName, predicate: contextID, authoringRole: myroletype},
+          {request: "DeleteRole", subject: rolName, predicate: contextID, authoringRole: myroletype, onlyOnce: true},
           resolver,
           FIREANDFORGET,
           rejecter
@@ -1190,7 +1192,7 @@ class PerspectivesProxy
     return new Promise(function (resolver, rejecter)
       {
         return proxy.send(
-          {request: "Bind", subject: contextinstance, predicate: localRolName, object: contextType, rolDescription: rolDescription, authoringRole: myroletype },
+          {request: "Bind", subject: contextinstance, predicate: localRolName, object: contextType, rolDescription: rolDescription, authoringRole: myroletype, onlyOnce: true },
           resolver,
           FIREANDFORGET,
           rejecter
@@ -1204,7 +1206,7 @@ class PerspectivesProxy
     return new Promise(function (resolver, rejecter)
       {
         return proxy.send(
-          {request: "Bind_", subject: binder, object: binding, authoringRole: myroletype},
+          {request: "Bind_", subject: binder, object: binding, authoringRole: myroletype, onlyOnce: true},
           resolver,
           FIREANDFORGET,
           errorHanrejecterdler
@@ -1220,7 +1222,7 @@ class PerspectivesProxy
     return new Promise(function (resolver, rejecter)
       {
         return proxy.send(
-          {request: "CreateRol", subject: contextinstance, predicate: rolType, authoringRole: myroletype },
+          {request: "CreateRol", subject: contextinstance, predicate: rolType, authoringRole: myroletype, onlyOnce: true },
           resolver,
           FIREANDFORGET,
           rejecter
@@ -1234,7 +1236,7 @@ class PerspectivesProxy
     return new Promise(function (resolver, rejecter)
       {
         return proxy.send(
-          {request: "SetPreferredUserRoleType", subject: externalRoleId, object: userRoleName},
+          {request: "SetPreferredUserRoleType", subject: externalRoleId, object: userRoleName, onlyOnce: true},
           resolver,
           FIREANDFORGET,
           rejecter
