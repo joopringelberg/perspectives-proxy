@@ -41,6 +41,8 @@ let pdrProxyResolver/*, pdrProxyRejecter*/;
 let internalChannelResolver, internalChannelRejecter;
 let sharedWorkerChannelResolver/*, sharedWorkerChannelRejecter*/;
 
+let internalChannel;
+
 // This promise will resolve to an instance of PerspectivesProxy, with an InternalChannel.
 // The proxy uses the channel to actually send requests to the core. These requests will
 // turn up as 'output' of a Producer, ready to be consumed by some process.
@@ -54,7 +56,7 @@ const PDRproxy = new Promise(
   });
 
 // This promise will resolve to an instance of the InternalChannel.
-// It is used by a ServiceWorker that runs in the same javascript process as the core.
+// It is used by a SharedWorker that runs in the same javascript process as the core.
 const InternalChannelPromise = new Promise(
   function (resolve, reject)
   {
@@ -123,18 +125,25 @@ function sharedWorkerHostingPDRPort()
 
 // This function will be called from Perspectives Core if it want to set up an internal channel to a GUI.
 // emitStep will be bound to the constructor Emit, finishStep will be the constructor Finish.
+// Notice that it can only be called once with an actual effect on the value of the Promise
+// (promises can only be resolved once).
 function createRequestEmitterImpl (emitStep, finishStep, emit)
 {
   try
   {
     // Resolve InternalChannelPromise made above.
-    const icp = new InternalChannel(emitStep, finishStep, emit);
-    internalChannelResolver (icp);
+    internalChannel = new InternalChannel(emitStep, finishStep, emit);
+    internalChannelResolver (internalChannel);
   }
   catch(e)
   {
     internalChannelRejecter(e);
   }
+}
+
+function retrieveRequestEmitterImpl (emit)
+{
+  internalChannel.setEmit( emit );
 }
 
 ////////////////////////////////////////////////////////////////////////////////
@@ -167,6 +176,11 @@ class InternalChannel
     this.requestId = -1;
   }
 
+  setEmit (emit)
+  {
+    this.emit = emit;
+  }
+
   nextRequestId ()
   {
     this.requestId = this.requestId + 1;
@@ -185,6 +199,7 @@ class InternalChannel
   }
 
   // Returns a promise for unsubscriber information of the form: {subject: req.subject, corrId: req.corrId}
+  // Notice that fireAndForget will always be undefined for calls made from the SharedWorker script.
   send ( req, fireAndForget )
   {
     const proxy = this;
@@ -197,18 +212,29 @@ class InternalChannel
     // console.log( req );
     if (fireAndForget)
     {
+      // This duplicates the functionality in the SharedWorkerChannel. However, when calls are routed from the client
+      // through the SharedWorkerChannel, this InternalChannel lives on the PDR side of the Channel Messaging API and
+      // 'send' is never called with a value for fireAndForget.
       req.reactStateSetter = function( result )
         {
           // Move all properties to the default request to ensure we send a complete request.
+
           proxy.send(
             Object.assign(
               Object.assign({}, defaultRequest),
               { request: "Unsubscribe"
               , subject: req.subject
               , corrId: req.corrId}) );
+          // 
           setter( result );
         };
     }
+    // this.emit has Purescript type:
+    //    newtype Emitter m a r = Emitter (Step a r -> m Unit)
+    // where m is Effect.
+    // The Step a r is constructed by this.emitStep (which comes from Purescript as well).
+    // Hence, calling this.emit returns a Unit result (that we are not interested in here)
+    // in Effect. To actually compute that, we have to apply it (to zero arguments).
     this.emit( this.emitStep(req) )();
     // return a promise for the elementary data for unsubscribing.
     return new Promise( function( resolver /*.rejecter*/)
@@ -329,7 +355,7 @@ class SharedWorkerChannel
     return p;
   }
 
-  // runPDR :: UserName -> Password -> PouchdbUser -> Url -> Effect Unit
+  // runPDR :: UserName -> PouchdbUser -> Url -> Promise
   // Runs the PDR, if a value is returned it will be an error message.
   // {serviceWorkerMessage: "runPDR", startSuccesful: success }
   // {serviceWorkerMessage: "runPDR", error: e }
@@ -467,15 +493,21 @@ class SharedWorkerChannel
         // Store the valueReceiver.
         if (fireAndForget)
         {
+          // This is a once-only request, so we construct a valueReceiver
+          // that sends an Unsubscribe request to the proxy.
+          // In other words, as soon as we've received a first result,
+          // we unsubscribe.
           proxy.valueReceivers[ req.corrId ] = function( result )
             {
-              // Move all properties to the default request to ensure we send a complete request.
+              // Unsubscribe...
               proxy.send(
+                // Move all properties to the default request to ensure we send a complete request.
                 Object.assign(
                   Object.assign({}, defaultRequest),
                   { request: "Unsubscribe"
                   , subject: req.subject
                   , corrId: req.corrId}) );
+              // ... then return the first result to the client.
               setter( result );
             };
         }
@@ -514,31 +546,34 @@ class PerspectivesProxy
 
   // Returns a promise for unsuscriber information of the form: {subject: req.subject, corrId: req.corrId}
   // that can be used by the caller to unsubscribe from the core dependency network.
-  send (req, receiveValues, fireAndForget)
+  send (req, receiveValues, fireAndForget, errorHandler)
   {
-    // Handle errors here. Use `errorHandler` if provided by the PerspectivesProxy method, otherwise
-    // just log a warning on the console.
+    // Handle errors here. Use `errorHandler` if provided by the PerspectivesProxy method.
+    // Log errors to the console anyway for the developer.
     const handleErrors = function(response) // response = PerspectivesApiTypes.ResponseRecord
     {
       if (response.error)
       {
         console.warn( "This request:\n" + JSON.stringify(req) + "\n results in this error: \n" + response.error );
+        if (errorHandler)
+        {
+          errorHandler( response.error )
+        }
       }
-      else {
+      else
+      {
         receiveValues(response.result);
       }
-      // This is the Effect.
-      return function () {};
     };
     req.reactStateSetter = handleErrors;
     // Move all properties to the default request to ensure we send a complete request.
     const fullRequest = Object.assign( Object.assign({}, defaultRequest), req);
 
     // DEVELOPMENT ONLY: warn if any value is undefined
-    if ( Object.values(defaultRequest).includes( undefined ) )
-    {
-      console.warn( "Request misses values: " + JSON.stringify(defaultRequest) );
-    }
+    // if ( Object.values(fullRequest).includes( undefined ) )
+    // {
+    //   console.warn( "Request misses values: " + JSON.stringify(fullRequest) );
+    // }
 
     return this.channel.send( fullRequest, fireAndForget );
   }
@@ -549,6 +584,14 @@ class PerspectivesProxy
     this.channel.unsubscribe(req);
   }
 
+  ///////////////////////////////////////////////////////////////////////////////////////
+  //// GETTERS.
+  //// Getters take a function to receive values in and a function to receive errors in.
+  //// They return a value to unsubscribe from updates.
+  //// Optionally, by providing the FIREANDFORGET value, one can unsubscribe a call 
+  //// immediately.
+  ///////////////////////////////////////////////////////////////////////////////////////
+
   // getRolBinding (contextID, rolName, receiveValues)
   // {
   //   return this.send(
@@ -556,64 +599,62 @@ class PerspectivesProxy
   //     receiveValues);
   // }
   // rolName must be qualified but may use default prefixes.
-  getRol (contextID, rolName, receiveValues, fireAndForget)
+  getRol (contextID, rolName, receiveValues, fireAndForget, errorHandler)
   {
     return this.send(
       {request: "GetRol", subject: contextID, predicate: rolName},
       receiveValues,
-      fireAndForget);
+      fireAndForget, 
+      errorHandler);
   }
 
-  getUnqualifiedRol (contextID, localRolName, receiveValues, fireAndForget)
+  getUnqualifiedRol (contextID, localRolName, receiveValues, fireAndForget, errorHandler)
   {
     return this.send(
       {request: "GetUnqualifiedRol", subject: contextID, predicate: localRolName},
       receiveValues,
-      fireAndForget);
+      fireAndForget, 
+      errorHandler);
   }
 
-  getProperty (rolID, propertyName, roleType, receiveValues, fireAndForget)
+  getProperty (rolID, propertyName, roleType, receiveValues, fireAndForget, errorHandler)
   {
     return this.send(
       {request: "GetProperty", subject: rolID, predicate: propertyName, object: roleType},
       receiveValues,
-      fireAndForget);
+      fireAndForget,
+      errorHandler);
   }
 
-  getPropertyFromLocalName (rolID, propertyName, roleType, receiveValues, fireAndForget)
+  getPropertyFromLocalName (rolID, propertyName, roleType, receiveValues, fireAndForget, errorHandler)
   {
     return this.send(
       {request: "GetPropertyFromLocalName", subject: rolID, predicate: propertyName, object: roleType},
       receiveValues,
-      fireAndForget
+      fireAndForget, 
+      errorHandler
     );
   }
 
-  getBinding (rolID, receiveValues, fireAndForget)
+  getBinding (rolID, receiveValues, fireAndForget, errorHandler)
   {
     return this.send(
       {request: "GetBinding", subject: rolID, predicate: ""},
       receiveValues,
-      fireAndForget);
-  }
-
-  getBindingType (rolID, receiveValues, fireAndForget)
-  {
-    return this.send(
-      {request: "GetBindingType", subject: rolID, predicate: ""},
-      receiveValues,
-      fireAndForget);
+      fireAndForget,
+      errorHandler);
   }
 
   // Note: this function is currently not in use.
   // The lexical context of the roleType can be used by providing the empty string
   // as argument for parameter contextType.
-  getRoleBinders (rolID, contextType, roleType, receiveValues, fireAndForget)
+  getRoleBinders (rolID, contextType, roleType, receiveValues, fireAndForget, errorHandler)
   {
     return this.send(
       {request: "GetRoleBinders", subject: rolID, predicate: roleType, object: contextType},
       receiveValues,
-      fireAndForget);
+      fireAndForget, 
+      errorHandler);
   }
 
   // getUnqualifiedRoleBinders (rolID, localRolName, receiveValues)
@@ -623,86 +664,29 @@ class PerspectivesProxy
   //     receiveValues);
   // }
 
-  getViewProperties (rolType, viewName, receiveValues, fireAndForget)
-  {
-    return this.send(
-      {request: "GetViewProperties", subject: rolType, predicate: viewName},
-      receiveValues,
-      fireAndForget);
-  }
-
-  getRolContext (rolID, receiveValues, fireAndForget)
-  {
-    return this.send(
-      {request: "GetRolContext", subject: rolID, predicate: ""},
-      receiveValues,
-      fireAndForget);
-  }
-
-  getContextType (contextID, receiveValues, fireAndForget)
-  {
-    return this.send(
-      {request: "GetContextType", subject: contextID, predicate: ""},
-      receiveValues,
-      fireAndForget);
-  }
-
-  getRolType (rolID, receiveValues, fireAndForget)
-  {
-    return this.send(
-      {request: "GetRolType", subject: rolID, predicate: ""},
-      receiveValues,
-      fireAndForget);
-  }
-
-  // RoleInContext | ContextRole | ExternalRole | UserRole | BotRole
-  getRoleKind (rolID, receiveValues, fireAndForget)
-  {
-    return this.send(
-      {request: "GetRoleKind", subject: rolID, predicate: ""},
-      receiveValues,
-      fireAndForget);
-  }
-
-  getUnqualifiedRolType (contextType, localRolName, receiveValues, fireAndForget)
-  {
-    return this.send(
-      {request: "GetUnqualifiedRolType", subject: contextType, predicate: localRolName},
-      receiveValues,
-      fireAndForget);
-  }
-
   // Returns an array of Role Types.
-  getMeForContext (externalRoleInstance, receiveValues, fireAndForget)
+  getMeForContext (externalRoleInstance, receiveValues, fireAndForget, errorHandler)
   {
     return this.send(
       {request: "GetMeForContext", subject: externalRoleInstance},
       receiveValues,
-      fireAndForget
-    );
-  }
-
-  // NOTE: it is not possible to subscribe to update events on this query.
-  getAllMyRoleTypes(externalRoleInstance, receiveValues)
-  {
-    return this.send(
-      {request: "GetAllMyRoleTypes", subject: externalRoleInstance},
-      receiveValues,
-      true
+      fireAndForget, 
+      errorHandler
     );
   }
 
   // The instance of model:System$PerspectivesSystem$User that represents the user operating this PDR.
-  getUserIdentifier (receiveValues, fireAndForget)
+  getUserIdentifier (receiveValues, fireAndForget, errorHandler)
   {
     return this.send(
       {request: "GetUserIdentifier"},
       receiveValues,
-      fireAndForget
+      fireAndForget, 
+      errorHandler
     );
   }
 
-  getPerspectives (contextInstance, userRoleType, receiveValues, fireAndForget)
+  getPerspectives (contextInstance, userRoleType, receiveValues, fireAndForget, errorHandler)
   {
     return this.send(
       { request: "GetPerspectives"
@@ -713,12 +697,13 @@ class PerspectivesProxy
       {
         return receiveValues(perspectiveStrings.map( JSON.parse ));
       },
-      fireAndForget
+      fireAndForget, 
+      errorHandler
     );
   }
 
   // { request: "GetPerspective", subject: UserRoleType OPTIONAL, predicate: RoleInstance, object: ContextInstance OPTIONAL }
-  getPerspective (contextInstance/*optional*/, userRoleType/*optional*/, roleInstance, receiveValues, fireAndForget)
+  getPerspective (contextInstance/*optional*/, userRoleType/*optional*/, roleInstance, receiveValues, fireAndForget, errorHandler)
   {
     return this.send(
       { request: "GetPerspective"
@@ -730,12 +715,13 @@ class PerspectivesProxy
       {
         return receiveValues(perspectiveStrings.map( JSON.parse ));
       },
-      fireAndForget
+      fireAndForget, 
+      errorHandler
     );
   }
 
   // { request: "GetScreen", subject: UserRoleType, predicate: ContextType, object: ContextInstance }
-  getScreen(userRoleType, contextInstance, contextType, receiveValues, fireAndForget)
+  getScreen(userRoleType, contextInstance, contextType, receiveValues, fireAndForget, errorHandler)
   {
     return this.send(
       { request: "GetScreen"
@@ -747,11 +733,12 @@ class PerspectivesProxy
       {
         return receiveValues(screenStrings.map( JSON.parse ));
       },
-      fireAndForget
+      fireAndForget, 
+      errorHandler
     );
   }
 
-  getRolesWithProperties (contextInstance, roleType, receiveValues, fireAndForget)
+  getRolesWithProperties (contextInstance, roleType, receiveValues, fireAndForget, errorHandler)
   {
     return this.send(
       { request: "GetRolesWithProperties"
@@ -761,22 +748,24 @@ class PerspectivesProxy
       {
         return receiveValues( roleWithPropertiesStrings.map (JSON.parse ) );
       },
-      fireAndForget
+      fireAndForget, 
+      errorHandler
     );
   }
 
-  getLocalRoleSpecialisation( localAspectName, contextInstance, receiveValues, fireAndForget )
+  getLocalRoleSpecialisation( localAspectName, contextInstance, receiveValues, fireAndForget, errorHandler )
   {
     return this.send(
       { request: "GetLocalRoleSpecialisation"
       , subject: contextInstance
       , predicate: localAspectName},
       receiveValues,
-      fireAndForget
+      fireAndForget, 
+      errorHandler
     );
   }
 
-  getRoleName( rid, receiveValues, fireAndForget )
+  getRoleName( rid, receiveValues, fireAndForget, errorHandler )
   {
     this.send(
       { request: "GetRoleName"
@@ -784,9 +773,207 @@ class PerspectivesProxy
       }
       , receiveValues
       , fireAndForget
+      , errorHandler
     );
   }
 
+    // checkBinding( <contexttype>, <(local)RolName>, <binding>, [() -> undefined] )
+  // Where (local)RolName identifies the role in <contexttype> whose binding specification we want to compare with <binding>.
+  checkBinding (contextType, localRolName, rolInstance, callback, fireAndForget, errorHandler)
+  {
+    this.send(
+      {request: "CheckBinding", subject: contextType, predicate: localRolName, object: rolInstance}
+      , callback
+      , fireAndForget
+      , errorHandler
+    );
+  }
+
+  // We haven't made this promisebased because the binding can change, even though its type cannot.
+  getBindingType (rolID, receiveValues, fireAndForget, errorHandler)
+  {
+    return this.send(
+      {request: "GetBindingType", subject: rolID, predicate: ""},
+      receiveValues,
+      fireAndForget, 
+      errorHandler);
+  }
+
+  ///////////////////////////////////////////////////////////////////////////////////////
+  //// PROMISE RETURNING GETTERS.
+  //// These getters, by their nature, return a result only once.
+  ///////////////////////////////////////////////////////////////////////////////////////
+
+    // checkBinding( <contexttype>, <(local)RolName>, <binding>, [() -> undefined] )
+  // Where (local)RolName identifies the role in <contexttype> whose binding specification we want to compare with <binding>.
+  // A version that returns a promise for a boolean value. NOTE: the promise can be fulfilled with `false`, meaning the binding cannot be made.
+  // This is different then failure, meaning that something went wrong in computing.
+  checkBindingP (contextType, localRolName, rolInstance)
+  {
+    const proxy = this;
+    return new Promise(function(resolver, rejecter)
+      {
+        proxy.send(
+          {request: "CheckBinding", subject: contextType, predicate: localRolName, object: rolInstance}
+          , resolver
+          , FIREANDFORGET
+          , rejecter
+        );
+      });
+  }
+
+
+  matchContextName( name )
+  {
+    const proxy = this;
+    return new Promise(function(resolver, rejecter)
+      {
+        proxy.send(
+          {request: "MatchContextName", subject: name},
+          function(qualifiedNames)
+          {
+            resolver( qualifiedNames );
+          },
+          FIREANDFORGET,
+          function(e){ rejecter( e )}
+        );
+      });
+  }
+
+  getCouchdbUrl()
+  {
+    const proxy = this;
+    return new Promise(function (resolver, rejecter)
+      {
+        proxy.send(
+          { request: "GetCouchdbUrl" },
+          function( url )
+          {
+            resolver( url );
+          },
+          FIREANDFORGET,
+          function(e){ rejecter( e )}
+        );
+      });
+  }
+
+  // { request: GetContextActions
+  // , subject: RoleType // the user role type
+  // , object: ContextInstance
+  // }
+  getContextActions(myRoleType, contextInstance)
+  {
+    const proxy = this;
+    return new Promise(function (resolver, rejecter)
+    {
+      proxy.send({ request: "GetContextActions", subject: myRoleType, object: contextInstance }, 
+      resolver,
+      FIREANDFORGET,
+      rejecter
+      );
+    })
+  }
+
+  getAllMyRoleTypes(externalRoleInstance)
+  {
+    const proxy = this;
+    return new Promise(function (resolver, rejecter)
+      {
+        return proxy.send(
+          {request: "GetAllMyRoleTypes", subject: externalRoleInstance},
+          resolver,
+          FIREANDFORGET, 
+          rejecter
+        );
+      })
+  }
+
+  getViewProperties (rolType, viewName)
+  {
+    const proxy = this;
+    return new Promise(function (resolver, rejecter)
+      {
+        return proxy.send(
+          {request: "GetViewProperties", subject: rolType, predicate: viewName},
+          resolver,
+          FIREANDFORGET, 
+          rejecter);
+        });
+  }
+
+  getContextType (contextID)
+  {
+    const proxy = this;
+    return new Promise(function (resolver, rejecter)
+      {
+        return proxy.send(
+          {request: "GetContextType", subject: contextID, predicate: ""},
+          resolver,
+          FIREANDFORGET, 
+          rejecter);
+      });
+  }
+
+  getRolContext (rolID)
+  {
+    const proxy = this;
+    return new Promise(function (resolver, rejecter)
+      {
+        return proxy.send(
+        {request: "GetRolContext", subject: rolID, predicate: ""},
+        resolver,
+        FIREANDFORGET,
+        rejecter);
+      });
+  }
+
+  getRolType (rolID)
+  {
+    const proxy = this;
+    return new Promise(function (resolver, rejecter)
+      {
+        return proxy.send(
+          {request: "GetRolType", subject: rolID, predicate: ""},
+          resolver,
+          FIREANDFORGET, 
+          rejecter);
+      });
+  }
+
+  // RoleInContext | ContextRole | ExternalRole | UserRole | BotRole
+  getRoleKind (rolID)
+  {
+    const proxy = this;
+    return new Promise(function (resolver, rejecter)
+      {
+        return proxy.send(
+          {request: "GetRoleKind", subject: rolID, predicate: ""},
+          resolver,
+          FIREANDFORGET, 
+          rejecter);
+      });
+  }
+
+  getUnqualifiedRolType (contextType, localRolName)
+  {
+    const proxy = this;
+    return new Promise(function (resolver, rejecter)
+      {
+        return proxy.send(
+          {request: "GetUnqualifiedRolType", subject: contextType, predicate: localRolName},
+          resolver,
+          FIREANDFORGET, 
+          rejecter);
+      });
+  }
+
+///////////////////////////////////////////////////////////////////////////////////////
+  //// SETTERS.
+  //// Other than Getters, Setters change the Perspectives Universe.
+  //// Setters return a promise that can succeed or fail. The return value may be symbolical
+  //// of success or may relate to wat was created, for example.
+  ///////////////////////////////////////////////////////////////////////////////////////
+  
   // Create a context, bound to a new instance of <roleType> in <contextId>. <roleType> may be a local name.
   // The ctype in the contextDescription must be qualified, but it may use a default prefix.
   // createContext( <contextDescription>, <roleType>, <contextId>, <EmbeddingContextType>, <myRoleType> ...)
@@ -797,88 +984,95 @@ class PerspectivesProxy
   //  - just a single string identifiying the external role of a DBQ role;
   //  - that string and a second that identifies the new context role otherwise.
   // So:  [<externalRoleId>(, <contextRoleId>)?]
-  createContext (contextDescription, roleType, contextId, embeddingContextType, myroletype, receiveResponse)
+  createContext (contextDescription, roleType, contextId, embeddingContextType, myroletype)
   {
-    this.send(
-      {request: "CreateContext", subject: contextId, predicate: roleType, object: embeddingContextType, contextDescription: contextDescription, authoringRole: myroletype},
-      function(r)
+    const proxy = this;
+    return new Promise(function (resolver, rejecter)
       {
-        receiveResponse( r );
-      }
-    );
+        return proxy.send(
+          {request: "CreateContext", subject: contextId, predicate: roleType, object: embeddingContextType, contextDescription: contextDescription, authoringRole: myroletype},
+          resolver,
+          FIREANDFORGET,
+          rejecter
+          );
+        });
   }
 
   // Create a context, bound to the given role instance.
   // createContext_( <contextDescription>, <roleinstance>, ...)
   // Either throws an error, or returns an array with a context identifier.
-  createContext_ (contextDescription, roleInstance, myroletype, receiveResponse)
+  createContext_ (contextDescription, roleInstance, myroletype)
   {
-    this.send(
-      {request: "CreateContext_", subject: roleInstance, contextDescription: contextDescription, authoringRole: myroletype},
-      function(r)
+    const proxy = this;
+    return new Promise(function (resolver, rejecter)
       {
-        receiveResponse( r );
-      }
-    );
+        return proxy.send(
+          {request: "CreateContext_", subject: roleInstance, contextDescription: contextDescription, authoringRole: myroletype},
+          resolver, 
+          FIREANDFORGET,
+          rejecter
+        );
+    });
   }
 
   // Either throws an error, or returns an array of context identifiers.
-  importContexts (contextDescription, receiveResponse)
+  importContexts (contextDescription)
   {
-    this.send(
-      {request: "ImportContexts", contextDescription: contextDescription},
-      function(r)
+    const proxy = this;
+    return new Promise(function (resolver, rejecter)
       {
-        receiveResponse( r );
-      }
-    );
+        return proxy.send(
+          {request: "ImportContexts", contextDescription: contextDescription},
+          resolver, 
+          FIREANDFORGET,
+          rejecter
+        );
+        });
   }
 
   // Either throws an error, or returns an empty array.
   // Notice we re-use the contextDescription field.
-  importTransaction (transaction, receiveResponse)
+  importTransaction (transaction)
   {
-    this.send(
-      {request: "ImportTransaction", contextDescription: transaction},
-      function(r)
+    const proxy = this;
+    return new Promise(function (resolver, rejecter)
       {
-        receiveResponse( r );
-      }
-    );
+        return proxy.send(
+          {request: "ImportTransaction", contextDescription: transaction},
+          resolver, 
+          FIREANDFORGET,
+          rejecter
+          );
+      });
   }
 
   // value is just a single string!
-  setProperty (rolID, propertyName, value, myroletype, callback)
-  {
-    this.send(
-      {request: "SetProperty", subject: rolID, predicate: propertyName, object: value, authoringRole: myroletype},
-      callback || function() {}
-    );
-  }
-
-  // Function returns a promise.
-  setPropertyP (rolID, propertyName, value, myroletype)
+  setProperty (rolID, propertyName, value, myroletype)
   {
     const proxy = this;
-    return new Promise(function(resolver)
+    return new Promise(function (resolver, rejecter)
       {
-        proxy.send(
-          {request: "SetProperty", subject: rolID, predicate: propertyName, object: value, authoringRole: myroletype},
-          function(whatever)
-          {
-            resolver( whatever );
-          }
+        return proxy.send(
+          {request: "SetProperty", subject: rolID, predicate: propertyName, object: value, authoringRole: myroletype}
+          , resolver
+          , FIREANDFORGET
+          , rejecter
         );
       });
-
   }
 
   deleteProperty (rolID, propertyName, myroletype)
   {
-    this.send(
-      {request: "DeleteProperty", subject: rolID, predicate: propertyName, authoringRole: myroletype},
-      function() {}
-    );
+    const proxy = this;
+    return new Promise(function (resolver, rejecter)
+      {
+        return proxy.send(
+          {request: "DeleteProperty", subject: rolID, predicate: propertyName, authoringRole: myroletype},
+          resolver, 
+          FIREANDFORGET,
+          rejecter
+        );
+      });
   }
 
   // { request: Action
@@ -892,6 +1086,7 @@ class PerspectivesProxy
   //   ...}
   action (objectRoleInstance, contextInstance, perspectiveId, actionName, authoringRole)
   {
+    const proxy = this;
     const req = { request: "Action"
       , predicate: objectRoleInstance
       , object: contextInstance
@@ -902,7 +1097,14 @@ class PerspectivesProxy
     {
       req.predicate = objectRoleInstance;
     }
-    this.send( req );
+    return new Promise(function (resolver, rejecter)
+      {
+        return proxy.send(
+          req,
+          resolver,
+          FIREANDFORGET, 
+          rejecter );
+      });
   }
 
   // { request: ContextAction
@@ -912,142 +1114,149 @@ class PerspectivesProxy
   // }
   contextAction( contextid, myRoleType, actionName)
   {
-    this.send({request: "ContextAction", subject: myRoleType, predicate: actionName, object: contextid, authoringRole: myRoleType });
-  }
-
-  // { request: GetContextActions
-  // , subject: RoleType // the user role type
-  // , object: ContextInstance
-  // }
-  getContextActions(myRoleType, contextInstance, receiveValues)
-  {
-    this.send({ request: "GetContextActions", subject: myRoleType, object: contextInstance }, receiveValues);
+    const proxy = this;
+    return new Promise(function (resolver, rejecter)
+      {
+        return proxy.send(
+        {request: "ContextAction", subject: myRoleType, predicate: actionName, object: contextid, authoringRole: myRoleType },
+        resolver,
+        FIREANDFORGET,
+        rejecter)
+      });
   }
 
   removeBinding (rolID, myroletype)
   {
-    this.send(
-      {request: "RemoveBinding", subject: rolID, authoringRole: myroletype},
-      function() {}
-    );
-  }
-
-  removeRol (rolName, rolID, myroletype, callback)
-  {
-    this.send(
-      {request: "RemoveRol", subject: rolID, predicate: rolName, authoringRole: myroletype},
-      (callback ? callback : function(){})
-    );
-  }
-
-  //{request: "RemoveContext", subject: rolID, predicate: rolName, authoringRole: myroletype}
-  // rolName must be qualified.
-  removeContext (rolID, rolName, myroletype, callback)
-  {
-    this.send(
-      {request: "RemoveContext", subject: rolID, predicate: rolName, authoringRole: myroletype},
-      (callback ? callback : function(){})
-    );
-  }
-
-  // Currently not used!
-  deleteRole (contextID, rolName, rolID, myroletype)
-  {
-    this.send(
-      {request: "DeleteRole", subject: rolName, predicate: contextID, authoringRole: myroletype},
-      function() {}
-    );
-  }
-
-
-  bind (contextinstance, localRolName, contextType, rolDescription, myroletype/*, receiveResponse*/)
-  {
-    this.send(
-      {request: "Bind", subject: contextinstance, predicate: localRolName, object: contextType, rolDescription: rolDescription, authoringRole: myroletype },
-      function() {}
-    );
-  }
-
-  bind_ (binder, binding, myroletype)
-  {
-    this.send(
-      {request: "Bind_", subject: binder, object: binding, authoringRole: myroletype},
-      function() {}
-    );
-  }
-
-  // checkBinding( <contexttype>, <(local)RolName>, <binding>, [() -> undefined] )
-  // Where (local)RolName identifies the role in <contexttype> whose binding specification we want to compare with <binding>.
-  checkBinding (contextType, localRolName, rolInstance, callback, fireAndForget)
-  {
-    this.send(
-      {request: "CheckBinding", subject: contextType, predicate: localRolName, object: rolInstance}
-      , callback
-      , fireAndForget
-    );
-  }
-
-  // We have room for checkBinding_( <binder>, <binding>, [() -> undefined] )
-
-  createRole (contextinstance, rolType, myroletype/*, receiveResponse*/)
-  {
-    this.send(
-      {request: "CreateRol", subject: contextinstance, predicate: rolType, authoringRole: myroletype },
-      function() {}
-    );
-  }
-
-  setPreferredUserRoleType( externalRoleId, userRoleName )
-  {
-    this.send(
-      {request: "SetPreferredUserRoleType", subject: externalRoleId, object: userRoleName},
-      function(){}
-    );
-  }
-
-  // NOTE: this function returns a promise and does not take a callback!
-  matchContextName( name )
-  {
     const proxy = this;
-    return new Promise(function(resolver)
+    return new Promise(function (resolver, rejecter)
       {
-        proxy.send(
-          {request: "MatchContextName", subject: name},
-          function(qualifiedNames)
-          {
-            resolver( qualifiedNames );
-          }
+        return proxy.send(
+          {request: "RemoveBinding", subject: rolID, authoringRole: myroletype},
+          resolver,
+          FIREANDFORGET,
+          rejecter
         );
       });
   }
 
-  // NOTE: this function returns a promise and does not take a callback!
-  getCouchdbUrl()
+  removeRol (rolName, rolID, myroletype)
   {
     const proxy = this;
-    return new Promise(function (resolver)
+    return new Promise(function (resolver, rejecter)
       {
-        proxy.send(
-          { request: "GetCouchdbUrl" },
-          function( url )
-          {
-            resolver( url );
-          }
+        return proxy.send(
+          {request: "RemoveRol", subject: rolID, predicate: rolName, authoringRole: myroletype},
+          resolver,
+          FIREANDFORGET,
+          rejecter
+          );
+      });
+  }
+
+  //{request: "RemoveContext", subject: rolID, predicate: rolName, authoringRole: myroletype}
+  // rolName must be qualified.
+  removeContext (rolID, rolName, myroletype)
+  {
+    const proxy = this;
+    return new Promise(function (resolver, rejecter)
+      {
+        return proxy.send(
+          {request: "RemoveContext", subject: rolID, predicate: rolName, authoringRole: myroletype},
+          resolver,
+          FIREANDFORGET,
+          rejecter
+        );
+      });
+  }
+
+  // Currently not used!
+  deleteRole (contextID, rolName, myroletype )
+  {
+    const proxy = this;
+    return new Promise(function (resolver, rejecter)
+      {
+        return proxy.send(
+          {request: "DeleteRole", subject: rolName, predicate: contextID, authoringRole: myroletype},
+          resolver,
+          FIREANDFORGET,
+          rejecter
+        );
+      });
+  }
+
+  bind (contextinstance, localRolName, contextType, rolDescription, myroletype )
+  {
+    const proxy = this;
+    return new Promise(function (resolver, rejecter)
+      {
+        return proxy.send(
+          {request: "Bind", subject: contextinstance, predicate: localRolName, object: contextType, rolDescription: rolDescription, authoringRole: myroletype },
+          resolver,
+          FIREANDFORGET,
+          rejecter
+        );
+      });
+  }
+
+  bind_ (binder, binding, myroletype)
+  {
+    const proxy = this;
+    return new Promise(function (resolver, rejecter)
+      {
+        return proxy.send(
+          {request: "Bind_", subject: binder, object: binding, authoringRole: myroletype},
+          resolver,
+          FIREANDFORGET,
+          errorHanrejecterdler
+        );
+      });
+  }
+
+  // We have room for checkBinding_( <binder>, <binding>, [() -> undefined] )
+
+  createRole (contextinstance, rolType, myroletype)
+  {
+    const proxy = this;
+    return new Promise(function (resolver, rejecter)
+      {
+        return proxy.send(
+          {request: "CreateRol", subject: contextinstance, predicate: rolType, authoringRole: myroletype },
+          resolver,
+          FIREANDFORGET,
+          rejecter
+          );
+      });
+  }
+
+  setPreferredUserRoleType( externalRoleId, userRoleName )
+  {
+    const proxy = this;
+    return new Promise(function (resolver, rejecter)
+      {
+        return proxy.send(
+          {request: "SetPreferredUserRoleType", subject: externalRoleId, object: userRoleName},
+          resolver,
+          FIREANDFORGET,
+          rejecter
         );
       });
   }
 
 }
+const FIREANDFORGET = true;
+const CONTINUOUS = false;
 
 module.exports = {
   PDRproxy: PDRproxy,
   InternalChannelPromise: InternalChannelPromise,
   SharedWorkerChannelPromise: SharedWorkerChannelPromise,
   createRequestEmitterImpl: createRequestEmitterImpl,
+  retrieveRequestEmitterImpl: retrieveRequestEmitterImpl,
   // createTcpConnectionToPerspectives: createTcpConnectionToPerspectives,
   // createServiceWorkerConnectionToPerspectives: createServiceWorkerConnectionToPerspectives,
   configurePDRproxy: configurePDRproxy,
-  FIREANDFORGET: true
+  FIREANDFORGET: true,
+  CONTINUOUS: false
 };
 
 ////////////////////////////////////////////////////////////////////////////////
