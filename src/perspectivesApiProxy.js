@@ -1062,6 +1062,24 @@ class PerspectivesProxy
       });
   }
 
+  // value is just a single string!
+  saveFile (rolID, propertyName, mimeType, file, myroletype)
+  {
+    const proxy = this;
+    file.arrayBuffer().then(
+      function(buf)
+      {
+        // Because contextDescription is declared as a Foreign, we put the ArrayBuffer there.
+        return proxy.send(
+          {request: "SaveFile", subject: rolID, predicate: propertyName, object: mimeType, contextDescription: buf, authoringRole: myroletype, onlyOnce: true}
+          , resolver
+          , FIREANDFORGET
+          , rejecter
+        );
+      }
+    );
+  }
+
   deleteProperty (rolID, propertyName, myroletype)
   {
     const proxy = this;
