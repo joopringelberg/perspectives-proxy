@@ -968,6 +968,20 @@ class PerspectivesProxy
       });
   }
 
+  getFile (roleInstance, propertyName)
+  {
+    const proxy = this;
+    return new Promise( function( resolver, rejecter)
+    {
+      return proxy.send(
+        { request: "GetFile", subject: roleInstance, predicate: propertyName },
+        resolver,
+        FIREANDFORGET,
+        rejecter
+        );
+    });
+  }
+
 ///////////////////////////////////////////////////////////////////////////////////////
   //// SETTERS.
   //// Other than Getters, Setters change the Perspectives Universe.
@@ -1066,16 +1080,19 @@ class PerspectivesProxy
   saveFile (rolID, propertyName, mimeType, file, myroletype)
   {
     const proxy = this;
-    file.arrayBuffer().then(
+    return file.arrayBuffer().then(
       function(buf)
       {
         // Because contextDescription is declared as a Foreign, we put the ArrayBuffer there.
-        return proxy.send(
-          {request: "SaveFile", subject: rolID, predicate: propertyName, object: mimeType, contextDescription: buf, authoringRole: myroletype, onlyOnce: true}
-          , resolver
-          , FIREANDFORGET
-          , rejecter
-        );
+        return new Promise(function (resolver, rejecter)
+        {
+          return proxy.send(
+            {request: "SaveFile", subject: rolID, predicate: propertyName, object: mimeType, contextDescription: buf, authoringRole: myroletype, onlyOnce: true}
+            , resolver
+            , FIREANDFORGET
+            , rejecter
+            );
+        });
       }
     );
   }
