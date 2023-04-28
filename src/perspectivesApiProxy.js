@@ -982,6 +982,21 @@ class PerspectivesProxy
     });
   }
 
+  // Returns a promise for the pubic address of the context - if any.
+  getPublicUrl (contextInstance)
+  {
+    const proxy = this;
+    return new Promise( function( resolver, rejecter )
+    {
+      return proxy.send(
+        { request: "GetPublicUrl", subject: contextInstance },
+        resolver,
+        FIREANDFORGET,
+        rejecter
+      );
+    });
+  }
+
 ///////////////////////////////////////////////////////////////////////////////////////
   //// SETTERS.
   //// Other than Getters, Setters change the Perspectives Universe.
