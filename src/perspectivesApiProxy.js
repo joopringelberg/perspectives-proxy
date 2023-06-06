@@ -778,14 +778,15 @@ class PerspectivesProxy
     );
   }
 
-    // checkBinding( <contexttype>, <(local)RolName>, <binding>, [() -> undefined] )
-  // Where (local)RolName identifies the role in <contexttype> whose binding specification we want to compare with <binding>.
-  checkBinding (contextType, localRolName, rolInstance, callback, fireAndForget, errorHandler)
+    // checkBinding( <(QUALIFIED)RolName>, <binding>, [() -> undefined] )
+  // Where RolName identifies the role in <contexttype> whose binding specification we want to compare with <binding>.
+  checkBinding (roleName, rolInstance, callback, errorHandler)
   {
     this.send(
-      {request: "CheckBinding", subject: contextType, predicate: localRolName, object: rolInstance}
+      // {request: "CheckBinding", predicate: roleName, object: rolInstance}
+      {request: "CheckBinding", predicate: roleName, object: rolInstance, onlyOnce: true}
       , callback
-      , fireAndForget
+      , FIREANDFORGET
       , errorHandler
     );
   }
@@ -805,17 +806,17 @@ class PerspectivesProxy
   //// These getters, by their nature, return a result only once.
   ///////////////////////////////////////////////////////////////////////////////////////
 
-    // checkBinding( <contexttype>, <(local)RolName>, <binding>, [() -> undefined] )
+    // checkBinding( <(QUALIFIED)RolName>, <binding>)
   // Where (local)RolName identifies the role in <contexttype> whose binding specification we want to compare with <binding>.
   // A version that returns a promise for a boolean value. NOTE: the promise can be fulfilled with `false`, meaning the binding cannot be made.
   // This is different then failure, meaning that something went wrong in computing.
-  checkBindingP (contextType, localRolName, rolInstance)
+  checkBindingP (roleName, rolInstance)
   {
     const proxy = this;
     return new Promise(function(resolver, rejecter)
       {
         proxy.send(
-          {request: "CheckBinding", subject: contextType, predicate: localRolName, object: rolInstance, onlyOnce: true}
+          {request: "CheckBinding", predicate: roleName, object: rolInstance, onlyOnce: true}
           , resolver
           , FIREANDFORGET
           , rejecter
