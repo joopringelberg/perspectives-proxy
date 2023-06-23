@@ -1260,7 +1260,7 @@ class PerspectivesProxy
           {request: "Bind_", subject: binder, object: binding, authoringRole: myroletype, onlyOnce: true},
           resolver,
           FIREANDFORGET,
-          errorHanrejecterdler
+          rejecter
         );
       });
   }
