@@ -536,6 +536,7 @@ class PerspectivesProxy
   constructor (channel)
   {
     this.channel = channel;
+    this.cursor = new Cursor();
   }
 
   // Inform the server that this client shuts down.
@@ -549,10 +550,13 @@ class PerspectivesProxy
   // that can be used by the caller to unsubscribe from the core dependency network.
   send (req, receiveValues, fireAndForget, errorHandler)
   {
+    const cursor = this.cursor;
     // Handle errors here. Use `errorHandler` if provided by the PerspectivesProxy method.
     // Log errors to the console anyway for the developer.
     const handleErrors = function(response) // response = PerspectivesApiTypes.ResponseRecord
     {
+      // Restore cursor shape
+      cursor.restore();
       if (response.error)
       {
         console.warn( "This request:\n" + JSON.stringify(req) + "\n results in this error: \n" + response.error );
@@ -576,6 +580,8 @@ class PerspectivesProxy
     //   console.warn( "Request misses values: " + JSON.stringify(fullRequest) );
     // }
 
+    // Set cursor shape
+    cursor.wait();
     return this.channel.send( fullRequest, fireAndForget );
   }
 
@@ -1311,6 +1317,27 @@ module.exports = {
   FIREANDFORGET: true,
   CONTINUOUS: false
 };
+
+////////////////////////////////////////////////////////////////////////////////
+//// CURSOR HANDLING
+////////////////////////////////////////////////////////////////////////////////
+class Cursor
+{
+  constructor()
+  {
+    this.previous_cursor_shape = document.body.style.cursor;
+  } 
+  wait()
+  {
+    document.body.style.cursor = "wait";
+  }
+  restore()
+  {
+    document.body.style.cursor = this.previous_cursor_shape;
+  }
+}
+
+
 
 ////////////////////////////////////////////////////////////////////////////////
 //// TCP CHANNEL
