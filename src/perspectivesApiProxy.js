@@ -682,17 +682,6 @@ class PerspectivesProxy
     );
   }
 
-  // The instance of model:System$PerspectivesSystem$User that represents the user operating this PDR.
-  getUserIdentifier (receiveValues, fireAndForget, errorHandler)
-  {
-    return this.send(
-      {request: "GetUserIdentifier"},
-      receiveValues,
-      fireAndForget, 
-      errorHandler
-    );
-  }
-
   getPerspectives (contextInstance, userRoleType, receiveValues, fireAndForget, errorHandler)
   {
     return this.send(
@@ -1004,6 +993,22 @@ class PerspectivesProxy
     });
   }
 
+    // The instance of model:System$PerspectivesSystem$User that represents the user operating this PDR.
+  getUserIdentifier ()
+    {
+      const proxy = this;
+      return new Promise( function( resolver, rejecter )
+      {
+        return proxy.send(
+          {request: "GetUserIdentifier"},
+          resolver,
+          FIREANDFORGET, 
+          rejecter
+        );
+      })
+    }
+  
+  
 ///////////////////////////////////////////////////////////////////////////////////////
   //// SETTERS.
   //// Other than Getters, Setters change the Perspectives Universe.
@@ -1323,17 +1328,13 @@ module.exports = {
 ////////////////////////////////////////////////////////////////////////////////
 class Cursor
 {
-  constructor()
-  {
-    this.previous_cursor_shape = document.body.style.cursor;
-  } 
   wait()
   {
     document.body.style.cursor = "wait";
   }
   restore()
   {
-    document.body.style.cursor = this.previous_cursor_shape;
+    document.body.style.cursor = "auto";
   }
 }
 
