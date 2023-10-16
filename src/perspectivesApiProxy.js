@@ -299,9 +299,9 @@ class SharedWorkerChannel
           // {serviceWorkerMessage: "resetAccount", resetSuccesful: b} where b is a boolean.
           this.valueReceivers.resetAccount( e.data.resetSuccesful );
           break;
-        case "recompileBasicModels":
-          // {serviceWorkerMessage: "recompileBasicModels", recompileSuccesful: b} where b is a boolean.
-          this.valueReceivers.recompileBasicModels( e.data.recompileSuccesful );
+        case "recompileLocalModels":
+          // {serviceWorkerMessage: "recompileLocalModels", recompileSuccesful: b} where b is a boolean.
+          this.valueReceivers.recompileLocalModels( e.data.recompileSuccesful );
           break;
         case "removeAccount":
           // {serviceWorkerMessage: "removeAccount", removeSuccesful: b} where b is a boolean.
@@ -337,11 +337,11 @@ class SharedWorkerChannel
     return p;
   }
 
-  // runPDR :: UserName -> PouchdbUser -> Url -> Promise
+  // runPDR :: UserName -> PouchdbUser -> Promise
   // Runs the PDR, if a value is returned it will be an error message.
   // {serviceWorkerMessage: "runPDR", startSuccesful: success }
   // {serviceWorkerMessage: "runPDR", error: e }
-  runPDR (username, pouchdbuser, publicrepo)
+  runPDR (username, pouchdbuser)
   {
     const proxy = this;
     const p = new Promise(
@@ -361,11 +361,11 @@ class SharedWorkerChannel
           };
       }
     );
-    proxy.channelId.then( channelId => this.port.postMessage({proxyRequest: "runPDR", username, pouchdbuser, publicrepo, channelId }));
+    proxy.channelId.then( channelId => this.port.postMessage({proxyRequest: "runPDR", username, pouchdbuser, channelId }));
     return p;
   }
 
-  createUser (username, pouchdbuser, publicrepo)
+  createUser (username, pouchdbuser)
   {
     const proxy = this;
     const p = new Promise(
@@ -378,11 +378,11 @@ class SharedWorkerChannel
           };
       }
     );
-    proxy.channelId.then( channelId => this.port.postMessage( {proxyRequest: "createAccount", username, pouchdbuser, publicrepo, channelId } ) );
+    proxy.channelId.then( channelId => this.port.postMessage( {proxyRequest: "createAccount", username, pouchdbuser, channelId } ) );
     return p;
   }
 
-  resetAccount (username, pouchdbuser, publicrepo)
+  resetAccount (username, pouchdbuser)
   {
     const proxy = this;
     const p = new Promise(
@@ -395,28 +395,28 @@ class SharedWorkerChannel
           };
       }
     );
-    proxy.channelId.then( channelId => this.port.postMessage( {proxyRequest: "resetAccount", username, pouchdbuser, publicrepo, channelId } ) );
+    proxy.channelId.then( channelId => this.port.postMessage( {proxyRequest: "resetAccount", username, pouchdbuser, channelId } ) );
     return p;
   }
 
-  recompileBasicModels (pouchdbuser, publicrepo)
+  recompileLocalModels (pouchdbuser)
   {
     const proxy = this;
     const p = new Promise(
       function(resolver/*, rejecter*/)
       {
-        proxy.valueReceivers.recompileBasicModels = function(result)
+        proxy.valueReceivers.recompileLocalModels = function(result)
           {
-            proxy.valueReceivers.recompileBasicModels = undefined;
+            proxy.valueReceivers.recompileLocalModels = undefined;
             resolver( result );
           };
       }
     );
-    proxy.channelId.then( channelId => this.port.postMessage( {proxyRequest: "recompileBasicModels", pouchdbuser, publicrepo, channelId } ) );
+    proxy.channelId.then( channelId => this.port.postMessage( {proxyRequest: "recompileLocalModels", pouchdbuser, channelId } ) );
     return p;
   }
 
-  removeAccount (username, pouchdbuser, publicrepo)
+  removeAccount (username, pouchdbuser)
   {
     const proxy = this;
     const p = new Promise(
@@ -429,7 +429,7 @@ class SharedWorkerChannel
           };
       }
     );
-    proxy.channelId.then( channelId => this.port.postMessage( {proxyRequest: "removeAccount", username, pouchdbuser, publicrepo, channelId } ) );
+    proxy.channelId.then( channelId => this.port.postMessage( {proxyRequest: "removeAccount", username, pouchdbuser, channelId } ) );
     return p;
   }
 
