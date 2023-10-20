@@ -104,6 +104,7 @@ function configurePDRproxy (channeltype, options)
        pdrProxyResolver( new PerspectivesProxy( sharedWorkerChannel ) );
        break;
      case "hostPageChannel":
+        // pageHostingPDRPort returns a MessageChannel as documented here: https://developer.mozilla.org/en-US/docs/Web/API/MessagePort.
         sharedWorkerChannel = new SharedWorkerChannel( options.pageHostingPDRPort() );
         sharedWorkerChannelResolver( sharedWorkerChannel );
         pdrProxyResolver( new PerspectivesProxy( sharedWorkerChannel ) );
@@ -113,6 +114,7 @@ function configurePDRproxy (channeltype, options)
 
 ////////////////////////////////////////////////////////////////////////////////
 //// PORT TO SHARED WORKER THAT HOSTS PDR
+//// This is a MessagePort, as documented in https://developer.mozilla.org/en-US/docs/Web/API/MessagePort.
 ////////////////////////////////////////////////////////////////////////////////
 function sharedWorkerHostingPDRPort()
 {
@@ -242,6 +244,7 @@ class InternalChannel
 ////////////////////////////////////////////////////////////////////////////////
 class SharedWorkerChannel
 {
+  // port is a MessagePort as documented here: https://developer.mozilla.org/en-US/docs/Web/API/MessagePort.
   constructor( port )
   {
     const serviceWorkerChannel = this;
