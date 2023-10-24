@@ -1,7 +1,7 @@
 {
   "name": "perspectives-proxy",
-  "version": "1.17.0",
-  "description": "Exposes perspectives-core either through TCP or a channel based on coroutines for apps with integrated core.",
+  "version": "1.18.0",
+  "description": "Exposes perspectives-core.",
   "main": "dist/perspectives-proxy.js",
   "scripts": {
     "test": "echo \"Error: no test specified\" && exit 1",
