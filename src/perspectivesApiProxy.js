@@ -368,7 +368,7 @@ class SharedWorkerChannel
     return p;
   }
 
-  createUser (username, pouchdbuser)
+  createAccount (username, pouchdbuser, runtimeOptions)
   {
     const proxy = this;
     const p = new Promise(
@@ -381,7 +381,7 @@ class SharedWorkerChannel
           };
       }
     );
-    proxy.channelId.then( channelId => this.port.postMessage( {proxyRequest: "createAccount", username, pouchdbuser, channelId } ) );
+    proxy.channelId.then( channelId => this.port.postMessage( {proxyRequest: "createAccount", username, pouchdbuser, channelId, runtimeOptions } ) );
     return p;
   }
 
