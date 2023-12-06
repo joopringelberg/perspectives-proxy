@@ -294,6 +294,9 @@ class SharedWorkerChannel
           // Handle the port identification message that is sent by the service worker.
           this.channelIdResolver( e.data.channelId );
           break;
+        case "pdrStarted":
+          this.valueReceivers.pdrStarted( e.data.pdrStarted );
+          break;
         case "isUserLoggedIn":
           // {serviceWorkerMessage: "isUserLoggedIn", isUserLoggedIn: b} where b is a boolean.
           this.valueReceivers.isUserLoggedIn( e.data.isUserLoggedIn );
@@ -320,6 +323,24 @@ class SharedWorkerChannel
           break;
       }
     }
+  }
+
+  // This promise will resolve regardless of whether the PDR has started or not.
+  pdrStarted ()
+  {
+    const proxy = this;
+    const p = new Promise(
+      function(resolver/*, rejecter*/)
+      {
+        proxy.valueReceivers.pdrStarted = function(hasStarted)
+          {
+            proxy.valueReceivers.pdrStarted = undefined;
+            resolver( hasStarted );
+          };
+      }
+    );
+    proxy.channelId.then( channelId => proxy.port.postMessage( {proxyRequest: "pdrStarted", channelId } ) );
+    return p;
   }
 
   // Returns a promise for a boolean value, reflecting whether the end user has logged in before or not.
