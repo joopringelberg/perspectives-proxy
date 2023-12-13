@@ -305,10 +305,14 @@ class SharedWorkerChannel
           // {serviceWorkerMessage: "resetAccount", resetSuccesful: b} where b is a boolean.
           this.valueReceivers.resetAccount( e.data.resetSuccesful );
           break;
-        case "recompileLocalModels":
-          // {serviceWorkerMessage: "recompileLocalModels", recompileSuccesful: b} where b is a boolean.
-          this.valueReceivers.recompileLocalModels( e.data.recompileSuccesful );
+        case "reCreateInstances":
+          // {serviceWorkerMessage: "reCreateInstances", reCreateSuccesful: b} where b is a boolean.
+          this.valueReceivers.reCreateInstances( e.data.reCreateSuccesful );
           break;
+        case "recompileLocalModels":
+        // {serviceWorkerMessage: "recompileLocalModels", recompileSuccesful: b} where b is a boolean.
+        this.valueReceivers.recompileLocalModels( e.data.recompileSuccesful );
+        break;
         case "removeAccount":
           // {serviceWorkerMessage: "removeAccount", removeSuccesful: b} where b is a boolean.
           this.valueReceivers.removeAccount( e.data.removeSuccesful );
@@ -420,6 +424,23 @@ class SharedWorkerChannel
       }
     );
     proxy.channelId.then( channelId => this.port.postMessage( {proxyRequest: "resetAccount", username, pouchdbuser, channelId } ) );
+    return p;
+  }
+
+  reCreateInstances (pouchdbuser)
+  {
+    const proxy = this;
+    const p = new Promise(
+      function(resolver/*, rejecter*/)
+      {
+        proxy.valueReceivers.reCreateInstances = function(result)
+          {
+            proxy.valueReceivers.reCreateInstances = undefined;
+            resolver( result );
+          };
+      }
+    );
+    proxy.channelId.then( channelId => this.port.postMessage( {proxyRequest: "reCreateInstances", pouchdbuser, channelId } ) );
     return p;
   }
 
