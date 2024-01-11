@@ -365,11 +365,11 @@ class SharedWorkerChannel
     return p;
   }
 
-  // runPDR :: UserName -> PouchdbUser -> Promise
+  // runPDR :: UserName -> PouchdbUser RuntimeOptions -> Promise
   // Runs the PDR, if a value is returned it will be an error message.
   // {serviceWorkerMessage: "runPDR", startSuccesful: success }
   // {serviceWorkerMessage: "runPDR", error: e }
-  runPDR (username, pouchdbuser)
+  runPDR (username, pouchdbuser, options)
   {
     const proxy = this;
     const p = new Promise(
@@ -389,7 +389,7 @@ class SharedWorkerChannel
           };
       }
     );
-    proxy.channelId.then( channelId => this.port.postMessage({proxyRequest: "runPDR", username, pouchdbuser, channelId }));
+    proxy.channelId.then( channelId => this.port.postMessage({proxyRequest: "runPDR", username, pouchdbuser, options, channelId }));
     return p;
   }
 
@@ -410,7 +410,7 @@ class SharedWorkerChannel
     return p;
   }
 
-  resetAccount (username, pouchdbuser)
+  resetAccount (username, pouchdbuser, options)
   {
     const proxy = this;
     const p = new Promise(
@@ -423,11 +423,11 @@ class SharedWorkerChannel
           };
       }
     );
-    proxy.channelId.then( channelId => this.port.postMessage( {proxyRequest: "resetAccount", username, pouchdbuser, channelId } ) );
+    proxy.channelId.then( channelId => this.port.postMessage( {proxyRequest: "resetAccount", username, pouchdbuser, options, channelId } ) );
     return p;
   }
 
-  reCreateInstances (pouchdbuser)
+  reCreateInstances (pouchdbuser, options)
   {
     const proxy = this;
     const p = new Promise(
@@ -440,7 +440,7 @@ class SharedWorkerChannel
           };
       }
     );
-    proxy.channelId.then( channelId => this.port.postMessage( {proxyRequest: "reCreateInstances", pouchdbuser, channelId } ) );
+    proxy.channelId.then( channelId => this.port.postMessage( {proxyRequest: "reCreateInstances", pouchdbuser, options, channelId } ) );
     return p;
   }
 
