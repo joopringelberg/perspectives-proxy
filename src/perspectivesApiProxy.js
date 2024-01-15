@@ -384,7 +384,7 @@ class SharedWorkerChannel
             }
             else
             {
-              resolver( e.startSuccesful );
+              resolver( e.data.startSuccesful );
             }
           };
       }
