@@ -986,21 +986,28 @@ class PerspectivesProxy
   
   // Create a context, bound to a new instance of <roleType> in <contextId>. <roleType> may be a local name.
   // The ctype in the contextDescription must be qualified, but it may use a default prefix.
-  // createContext( <contextDescription>, <roleType>, <contextId>, <EmbeddingContextType>, <myRoleType> ...)
-  // roleType may be a name local to the EmbeddingContextType.
-  // EmbeddingContextType must be fully qualified.
-  // contextId must be a valid identifier for the context to create. Default namespaces will be expanded (e.g. usr:)
+  /// 
+  // createContext( 
+  //      <contextDescription>
+  //    , <roleType>                      the qualified identifier of the role type to create.
+  //    , <ContextIdToAddRoleInstanceTo>  the context instance to create the role instance in.
+  //    , <myRoleType> 
+  //    )
   // Either throws an error, or returns an array with
   //  - just a single string identifiying the external role of a DBQ role;
   //  - that string and a second that identifies the new context role otherwise.
   // So:  [<externalRoleId>(, <contextRoleId>)?]
-  createContext (contextDescription, roleType, contextId, embeddingContextType, myroletype)
+
+  // object must be the type of the context to disambiguate the roleType name in.
+  // subject must be the context instance to add a role instance to.
+
+  createContext (contextDescription, roleType, contextIdToAddRoleInstanceTo, myroletype)
   {
     const proxy = this;
     return new Promise(function (resolver, rejecter)
       {
         return proxy.send(
-          {request: "CreateContext", subject: contextId, predicate: roleType, object: embeddingContextType, contextDescription: contextDescription, authoringRole: myroletype, onlyOnce: true},
+          {request: "CreateContext", subject: contextIdToAddRoleInstanceTo, predicate: roleType, contextDescription: contextDescription, authoringRole: myroletype, onlyOnce: true},
           resolver,
           rejecter
           );
