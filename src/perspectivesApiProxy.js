@@ -1223,13 +1223,13 @@ class PerspectivesProxy
       });
   }
 
-  bind_ (binder, binding, myroletype)
+  bind_ (filledRole, filler, myroletype)
   {
     const proxy = this;
     return new Promise(function (resolver, rejecter)
       {
         return proxy.send(
-          {request: "Bind_", subject: binder, object: binding, authoringRole: myroletype, onlyOnce: true},
+          {request: "Bind_", subject: filledRole, object: filler, authoringRole: myroletype, onlyOnce: true},
           resolver,
           rejecter
         );
