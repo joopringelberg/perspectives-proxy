@@ -694,14 +694,13 @@ class PerspectivesProxy
     );
   }
 
-  // { request: "GetPerspective", subject: UserRoleType OPTIONAL, predicate: RoleInstance, object: ContextInstance OPTIONAL }
-  getPerspective (contextInstance/*optional*/, userRoleType/*optional*/, roleInstance, receiveValues, fireAndForget, errorHandler)
+  // { request: "GetPerspective", subject: PerspectiveObjectRoleType OPTIONAL, predicate: RoleInstanceOfContext }
+  getPerspective (roleInstanceOfContext, perspectiveObjectRoleType /*OPTIONAL*/, receiveValues, fireAndForget, errorHandler)
   {
     return this.send(
       { request: "GetPerspective"
-      , subject: userRoleType
-      , predicate: roleInstance
-      , object: contextInstance
+      , subject: perspectiveObjectRoleType
+      , predicate: roleInstanceOfContext
       , onlyOnce: !!fireAndForget
       },
       function (perspectiveStrings)
