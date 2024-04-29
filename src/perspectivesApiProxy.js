@@ -393,7 +393,7 @@ class SharedWorkerChannel
     return p;
   }
 
-  createAccount (username, pouchdbuser, runtimeOptions)
+  createAccount (username, pouchdbuser, runtimeOptions, optionalIdentityDocument)
   {
     const proxy = this;
     const p = new Promise(
@@ -406,7 +406,7 @@ class SharedWorkerChannel
           };
       }
     );
-    proxy.channelId.then( channelId => this.port.postMessage( {proxyRequest: "createAccount", username, pouchdbuser, channelId, runtimeOptions } ) );
+    proxy.channelId.then( channelId => this.port.postMessage( {proxyRequest: "createAccount", username, pouchdbuser, channelId, runtimeOptions, identityDocument: optionalIdentityDocument ? optionalIdentityDocument : null } ) );
     return p;
   }
 
@@ -724,21 +724,6 @@ class PerspectivesProxy
       function (screenStrings)
       {
         return receiveValues(screenStrings.map( JSON.parse ));
-      },
-      errorHandler
-    );
-  }
-
-  getRolesWithProperties (contextInstance, roleType, receiveValues, fireAndForget, errorHandler)
-  {
-    return this.send(
-      { request: "GetRolesWithProperties"
-      , object: contextInstance
-      , predicate: roleType
-      , onlyOnce: !!fireAndForget },
-      function (roleWithPropertiesStrings)
-      {
-        return receiveValues( roleWithPropertiesStrings.map (JSON.parse ) );
       },
       errorHandler
     );
