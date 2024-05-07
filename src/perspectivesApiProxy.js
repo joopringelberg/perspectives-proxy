@@ -322,7 +322,7 @@ class SharedWorkerChannel
           this.valueReceivers.runPDR( e );
           break;
         case "createAccount":
-          // {serviceWorkerMessage: "createAccount", createSuccesful: b} where b is a boolean.
+          // {serviceWorkerMessage: "createAccount", createSuccesful: {success :: Boolean, reason :: Nullable String}}.
           this.valueReceivers.createAccount( e.data.createSuccesful );
           break;
       }
@@ -397,12 +397,20 @@ class SharedWorkerChannel
   {
     const proxy = this;
     const p = new Promise(
-      function(resolver/*, rejecter*/)
+      function(resolver, rejecter)
       {
-        proxy.valueReceivers.createAccount = function(result)
+        // {success :: Boolean, reason :: Nullable String}
+        proxy.valueReceivers.createAccount = function({success, reason})
           {
             proxy.valueReceivers.createAccount = undefined;
-            resolver( result );
+            if (success)
+            {
+              resolver( true );
+            }
+            else 
+            {
+              rejecter( {reason} );
+            }
           };
       }
     );
@@ -947,13 +955,13 @@ class PerspectivesProxy
   }
 
     // The instance of model:System$PerspectivesSystem$User that represents the user operating this PDR.
-  getUserIdentifier ()
+  getSystemIdentifier ()
     {
       const proxy = this;
       return new Promise( function( resolver, rejecter )
       {
         return proxy.send(
-          {request: "GetUserIdentifier", onlyOnce: true},
+          {request: "GetSystemIdentifier", onlyOnce: true},
           resolver,
           rejecter
         );
