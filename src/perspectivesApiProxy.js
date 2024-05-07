@@ -393,7 +393,7 @@ class SharedWorkerChannel
     return p;
   }
 
-  createAccount (username, pouchdbuser, runtimeOptions, optionalIdentityDocument)
+  createAccount (perspectivesUser, pouchdbuser, runtimeOptions, optionalIdentityDocument)
   {
     const proxy = this;
     const p = new Promise(
@@ -414,7 +414,7 @@ class SharedWorkerChannel
           };
       }
     );
-    proxy.channelId.then( channelId => this.port.postMessage( {proxyRequest: "createAccount", username, pouchdbuser, channelId, runtimeOptions, identityDocument: optionalIdentityDocument ? optionalIdentityDocument : null } ) );
+    proxy.channelId.then( channelId => this.port.postMessage( {proxyRequest: "createAccount", perspectivesUser, pouchdbuser, channelId, runtimeOptions, identityDocument: optionalIdentityDocument ? optionalIdentityDocument : null } ) );
     return p;
   }
 
