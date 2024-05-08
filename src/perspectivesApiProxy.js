@@ -954,7 +954,7 @@ class PerspectivesProxy
     });
   }
 
-    // The instance of model:System$PerspectivesSystem$User that represents the user operating this PDR.
+    // The instance of model:System$PerspectivesSystem that represents the installation.
   getSystemIdentifier ()
     {
       const proxy = this;
@@ -962,6 +962,20 @@ class PerspectivesProxy
       {
         return proxy.send(
           {request: "GetSystemIdentifier", onlyOnce: true},
+          resolver,
+          rejecter
+        );
+      })
+    }
+
+  // The instance of model:System$TheWorld$PerspectivesUsers that represents the natural person owning this installation in the Perspectives Universe.
+  getPerspectivesUser ()
+    {
+      const proxy = this;
+      return new Promise( function( resolver, rejecter )
+      {
+        return proxy.send(
+          {request: "GetPerspectivesUser", onlyOnce: true},
           resolver,
           rejecter
         );
