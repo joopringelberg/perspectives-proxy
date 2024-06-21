@@ -770,6 +770,14 @@ class PerspectivesProxy
       errorHandler);
   }
 
+  matchContextName( name, receiveValues, fireAndForget, errorHandler )
+  {
+    return this.send(
+      {request: "MatchContextName", subject: name, onlyOnce: !!fireAndForget},
+      receiveValues,
+      errorHandler);
+  }
+
   ///////////////////////////////////////////////////////////////////////////////////////
   //// PROMISE RETURNING GETTERS.
   //// These getters, by their nature, return a result only once.
@@ -793,21 +801,21 @@ class PerspectivesProxy
   }
 
 
-  matchContextName( name )
-  {
-    const proxy = this;
-    return new Promise(function(resolver, rejecter)
-      {
-        proxy.send(
-          {request: "MatchContextName", subject: name, onlyOnce: true},
-          function(qualifiedNames)
-          {
-            resolver( qualifiedNames );
-          },
-          function(e){ rejecter( e )}
-        );
-      });
-  }
+  // matchContextName( name )
+  // {
+  //   const proxy = this;
+  //   return new Promise(function(resolver, rejecter)
+  //     {
+  //       proxy.send(
+  //         {request: "MatchContextName", subject: name, onlyOnce: true},
+  //         function(qualifiedNames)
+  //         {
+  //           resolver( qualifiedNames );
+  //         },
+  //         function(e){ rejecter( e )}
+  //       );
+  //     });
+  // }
 
   getCouchdbUrl()
   {
