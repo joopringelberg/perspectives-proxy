@@ -1278,6 +1278,19 @@ class PerspectivesProxy
       });
   }
 
+  save()
+  {
+    const proxy = this;
+    return new Promise(function (resolver, rejecter)
+      {
+        return proxy.send(
+          {request: "Save", onlyOnce: true},
+          resolver,
+          rejecter
+        );
+      });
+  }
+
 }
 const FIREANDFORGET = true;
 const CONTINUOUS = false;
