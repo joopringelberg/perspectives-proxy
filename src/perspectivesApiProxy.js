@@ -778,6 +778,16 @@ class PerspectivesProxy
       errorHandler);
   }
 
+  // Returns {roleInstance, firstname, lastname, avatar [OPTIONAL]}
+  // rolID is the role that has the Chat properties; 
+  // propertyId is one of the Chat properties (messages or media) (by construction it must be Enumerated)
+  getChatParticipants( rolID, propertyId, receiveValues, fireAndForget, errorHandler)
+  {
+    return this.send(
+      {request: "GetChatParticipants", subject: rolID, predicate: propertyId, onlyOnce: !!fireAndForget},
+      (serialisedParticipants) => receiveValues( serialisedParticipants.map( JSON.parse )),
+      errorHandler);
+  }
   ///////////////////////////////////////////////////////////////////////////////////////
   //// PROMISE RETURNING GETTERS.
   //// These getters, by their nature, return a result only once.
@@ -990,7 +1000,36 @@ class PerspectivesProxy
       })
     }
   
-  
+  // The user role instance in the context of the given role instance that is ultimately filled by the PerspectivesUsers instance that represents
+  // the natural person owning this installation in the Perspectives Universe.
+  getMeInContext ( roleInstance )
+    {
+      const proxy = this;
+      return new Promise( function( resolver, rejecter )
+      {
+        return proxy.send(
+          {request: "GetMeInContext", subject: roleInstance, onlyOnce: true},
+          resolver,
+          rejecter
+        );
+      })
+    }
+
+  // Returns a Promise for {accountName, password, storageType, sharedStorageId}
+  getFileShareCredentials ()
+    {
+      const proxy = this;
+      return new Promise( function( resolver, rejecter )
+      {
+        return proxy.send(
+          {request: "GetFileShareCredentials", onlyOnce: true},
+          credentials => resolver(JSON.parse(credentials[0] ? credentials[0] : "{}")),
+          rejecter
+        );
+      })
+    }
+
+
 ///////////////////////////////////////////////////////////////////////////////////////
   //// SETTERS.
   //// Other than Getters, Setters change the Perspectives Universe.
@@ -1081,6 +1120,19 @@ class PerspectivesProxy
       {
         return proxy.send(
           {request: "SetProperty", subject: rolID, predicate: propertyName, object: value, authoringRole: myroletype, onlyOnce: true}
+          , resolver
+          , rejecter
+        );
+      });
+  }
+
+  addProperty (rolID, propertyName, value, myroletype)
+  {
+    const proxy = this;
+    return new Promise(function (resolver, rejecter)
+      {
+        return proxy.send(
+          {request: "AddProperty", subject: rolID, predicate: propertyName, object: value, authoringRole: myroletype, onlyOnce: true}
           , resolver
           , rejecter
         );
