@@ -1234,6 +1234,7 @@ class PerspectivesProxy
       });
   }
 
+  // remove rolID
   removeRol (rolName, rolID, myroletype)
   {
     const proxy = this;
@@ -1249,6 +1250,8 @@ class PerspectivesProxy
 
   //{request: "RemoveContext", subject: rolID, predicate: rolName, authoringRole: myroletype}
   // rolName must be qualified.
+  // remove rolID.
+  // rolName must be the authorized role type (the ContextRole type that is filled and that will be removed.)
   removeContext (rolID, rolName, myroletype)
   {
     const proxy = this;
