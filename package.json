@@ -1,6 +1,6 @@
 {
   "name": "perspectives-proxy",
-  "version": "1.21.0",
+  "version": "1.21.1",
   "description": "Exposes perspectives-core.",
   "main": "dist/perspectives-proxy.js",
   "scripts": {
@@ -23,14 +23,14 @@
   },
   "homepage": "https://github.com/joopringelberg/perspectives-proxy#readme",
   "devDependencies": {
-    "@babel/cli": "^7.12.1",
-    "@babel/core": "^7.12.3",
+    "@babel/cli": "^7.25.7",
+    "@babel/core": "^7.25.8",
     "@babel/plugin-syntax-dynamic-import": "^7.8.3",
-    "@babel/preset-env": "^7.12.1",
-    "babel-loader": "^8.2.1",
-    "eslint": "^7.13.0",
-    "eslint-plugin-react": "^7.21.5",
-    "webpack": "^5.4.0",
-    "webpack-cli": "^4.2.0"
+    "@babel/preset-env": "^7.25.8",
+    "babel-loader": "^9.2.1",
+    "eslint": "^9.12.0",
+    "eslint-plugin-react": "^7.37.1",
+    "webpack": "^5.95.0",
+    "webpack-cli": "^5.1.4"
   }
 }
