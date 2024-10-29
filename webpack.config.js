@@ -6,7 +6,8 @@ module.exports = {
     library: "perspectives-proxy",
     libraryTarget: "umd",
     filename: "perspectives-proxy.js",
-    path: path.join(__dirname, "dist")
+    path: path.join(__dirname, "dist"),
+    globalObject: "this"
   },
   watch: false,
   mode: "development",

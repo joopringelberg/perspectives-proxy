@@ -15,7 +15,7 @@
 		exports["perspectives-proxy"] = factory();
 	else
 		root["perspectives-proxy"] = factory();
-})(self, () => {
+})(this, () => {
 return /******/ (() => { // webpackBootstrap
 /******/ 	var __webpack_modules__ = ({
 
