@@ -1140,7 +1140,8 @@ class PerspectivesProxy
   }
 
   // value is just a single string!
-  saveFile (rolID, propertyName, mimeType, file, myroletype)
+  // saveFile (PerspectivesFileShape, File, myroletype)
+  saveFile( perspectivesFile, file, myroletype)
   {
     const proxy = this;
     return file.arrayBuffer().then(
@@ -1150,7 +1151,7 @@ class PerspectivesProxy
         return new Promise(function (resolver, rejecter)
         {
           return proxy.send(
-            {request: "SaveFile", subject: rolID, predicate: propertyName, object: mimeType, contextDescription: buf, authoringRole: myroletype, onlyOnce: true}
+            {request: "SaveFile", subject: perspectivesFile, contextDescription: buf, authoringRole: myroletype, onlyOnce: true}
             , resolver
             , rejecter
             );
