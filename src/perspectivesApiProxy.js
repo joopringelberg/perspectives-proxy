@@ -1347,6 +1347,19 @@ class PerspectivesProxy
       });
   }
 
+  evaluateRoleState( rolinstance )
+  {
+    const proxy = this;
+    return new Promise(function (resolver, rejecter)
+      {
+        return proxy.send(
+          {request: "EvaluateRoleInstance", subject: rolinstance, onlyOnce: true},
+          resolver,
+          rejecter
+        );
+      });
+  }
+
 }
 const FIREANDFORGET = true;
 const CONTINUOUS = false;
