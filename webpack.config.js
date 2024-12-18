@@ -12,4 +12,11 @@ module.exports = {
   watch: false,
   mode: "development",
   target: "webworker",
-};
+  externals: {
+    "perspectives-core": {
+      commonjs: "perspectives-core",
+      commonjs2: "perspectives-core",
+      amd: "perspectives-core",
+      root: "perspectives-core"
+    }
+  }};

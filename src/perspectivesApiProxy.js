@@ -104,8 +104,11 @@ function configurePDRproxy (channeltype, options)
        pdrProxyResolver( new PerspectivesProxy( sharedWorkerChannel ) );
        break;
      case "hostPageChannel":
-        // pageHostingPDRPort returns a MessageChannel as documented here: https://developer.mozilla.org/en-US/docs/Web/API/MessagePort.
-        sharedWorkerChannel = new SharedWorkerChannel( options.pageHostingPDRPort() );
+        import("perspectives-core").then( pdr => {
+          // pageHostingPDRPort returns a MessageChannel as documented here: https://developer.mozilla.org/en-US/docs/Web/API/MessagePort.
+          sharedWorkerChannel = new SharedWorkerChannel( options.pageHostingPDRPort( pdr ) );
+        });
+        
         sharedWorkerChannelResolver( sharedWorkerChannel );
         pdrProxyResolver( new PerspectivesProxy( sharedWorkerChannel ) );
         break;
