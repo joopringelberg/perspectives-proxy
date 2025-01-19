@@ -850,15 +850,28 @@ class PerspectivesProxy
   // , subject: RoleType // the user role type
   // , object: ContextInstance
   // }
+  // Returns a promise for a stringified object with the actions that can be performed in the context.
+  // The keys are the action names taken from the model; the values are their translations in the current language.
   getContextActions(myRoleType, contextInstance)
   {
     const proxy = this;
     return new Promise(function (resolver, rejecter)
     {
       proxy.send({ request: "GetContextActions", subject: myRoleType, object: contextInstance, onlyOnce: true }, 
-      resolver,
-      rejecter
-      );
+        function( actionsArr )
+        {
+          if (actionsArr.length === 0)
+          {
+            resolver( {} );
+          }
+          else 
+          {
+            // The actions are stored in the first element of the array, as a stringified object.
+            resolver( JSON.parse( actionsArr[0] ) );
+          }
+        },
+        rejecter
+        );
     })
   }
 
