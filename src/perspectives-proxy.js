@@ -38,35 +38,24 @@ The PDRproxy promise is imported by all of the modules in perspectives-react tha
 ////////////////////////////////////////////////////////////////////////////////
 
 let pdrProxyResolver/*, pdrProxyRejecter*/;
-let internalChannelResolver, internalChannelRejecter;
 let sharedWorkerChannelResolver/*, sharedWorkerChannelRejecter*/;
 
-let internalChannel;
-
-// This promise will resolve to an instance of PerspectivesProxy, with an InternalChannel.
+// This promise will resolve to an instance of PerspectivesProxy, with a SharedWorkerChannel that holds a port to the SharedWorker execution context,
+// or to the page execution context that hosts the PDR.
 // The proxy uses the channel to actually send requests to the core. These requests will
 // turn up as 'output' of a Producer, ready to be consumed by some process.
 // The channel uses the emit function as a callback: when it has a request to send, it calls 'emit'
 // after wrapping the request in the appropriate constructor (usually the emitStep).
-const PDRproxy = new Promise(
+export const PDRproxy = new Promise(
   function (resolve/*, reject*/)
   {
     pdrProxyResolver = resolve;
     //pdrProxyRejecter = reject;
   });
 
-// This promise will resolve to an instance of the InternalChannel.
-// It is used by a SharedWorker that runs in the same javascript process as the core.
-const InternalChannelPromise = new Promise(
-  function (resolve, reject)
-  {
-    internalChannelResolver = resolve;
-    internalChannelRejecter = reject;
-  });
-
 // This promise will resolve to an instance of the the SharedWorkerChannel.
 // It is used by InPlace, running in the same javascript process as this proxy.
-const SharedWorkerChannelPromise = new Promise(
+export const SharedWorkerChannelPromise = new Promise(
   function (resolve/*, reject*/)
   {
     sharedWorkerChannelResolver = resolve;
@@ -82,73 +71,28 @@ const SharedWorkerChannelPromise = new Promise(
 // type TCPOptions opts = {port :: Port, host :: Host, allowHalfOpen :: Boolean | opts}
 // type Port = Int
 // type Host = String
-function configurePDRproxy (channeltype, options)
+export function configurePDRproxy (channeltype, options)
 {
   let sharedWorkerChannel;
   switch( channeltype )
   {
-    case "internalChannel":
-      InternalChannelPromise.then(
-        function( ic )
-        {
-          pdrProxyResolver( new PerspectivesProxy( ic ) );
-        }
-      );
-      break;
-    // case "tcpChannel":
-    //   pdrProxyResolver( new PerspectivesProxy( new TcpChannel( options ) ) );
-    //   break;
     case "sharedWorkerChannel":
-       sharedWorkerChannel = new SharedWorkerChannel( sharedWorkerHostingPDRPort() );
+      const sharedWorker =  new SharedWorker(new URL('perspectives-sharedworker', import.meta.url), { type: 'module' })
+      //// Its port property is a MessagePort, as documented in https://developer.mozilla.org/en-US/docs/Web/API/MessagePort.
+      sharedWorkerChannel = new SharedWorkerChannel( sharedWorker.port );
+      sharedWorkerChannelResolver( sharedWorkerChannel );
+      pdrProxyResolver( new PerspectivesProxy( sharedWorkerChannel ) );
+      break;
+    case "hostPageChannel":
+        import( "perspectives-core" ).then( pdr => {
+      // pageHostingPDRPort returns a MessageChannel as documented here: https://developer.mozilla.org/en-US/docs/Web/API/MessagePort.
+      sharedWorkerChannel = new SharedWorkerChannel( options.pageHostingPDRPort( pdr ) );
+       });
+       
        sharedWorkerChannelResolver( sharedWorkerChannel );
        pdrProxyResolver( new PerspectivesProxy( sharedWorkerChannel ) );
        break;
-     case "hostPageChannel":
-        import("perspectives-core").then( pdr => {
-          // pageHostingPDRPort returns a MessageChannel as documented here: https://developer.mozilla.org/en-US/docs/Web/API/MessagePort.
-          sharedWorkerChannel = new SharedWorkerChannel( options.pageHostingPDRPort( pdr ) );
-        });
-        
-        sharedWorkerChannelResolver( sharedWorkerChannel );
-        pdrProxyResolver( new PerspectivesProxy( sharedWorkerChannel ) );
-        break;
   }
-}
-
-////////////////////////////////////////////////////////////////////////////////
-//// PORT TO SHARED WORKER THAT HOSTS PDR
-//// This is a MessagePort, as documented in https://developer.mozilla.org/en-US/docs/Web/API/MessagePort.
-////////////////////////////////////////////////////////////////////////////////
-function sharedWorkerHostingPDRPort()
-{
-  return new SharedWorker('perspectives-sharedworker.js').port;
-}
-
-////////////////////////////////////////////////////////////////////////////////
-//// SERVER SIDE RESOLVER TO INTERNAL CHANNEL
-////////////////////////////////////////////////////////////////////////////////
-
-// This function will be called from Perspectives Core if it want to set up an internal channel to a GUI.
-// emitStep will be bound to the constructor Emit, finishStep will be the constructor Finish.
-// Notice that it can only be called once with an actual effect on the value of the Promise
-// (promises can only be resolved once).
-function createRequestEmitterImpl (emitStep, finishStep, emit)
-{
-  try
-  {
-    // Resolve InternalChannelPromise made above.
-    internalChannel = new InternalChannel(emitStep, finishStep, emit);
-    internalChannelResolver (internalChannel);
-  }
-  catch(e)
-  {
-    internalChannelRejecter(e);
-  }
-}
-
-function retrieveRequestEmitterImpl (emit)
-{
-  internalChannel.setEmit( emit );
 }
 
 ////////////////////////////////////////////////////////////////////////////////
@@ -167,78 +111,6 @@ const defaultRequest =
   };
 
 
-////////////////////////////////////////////////////////////////////////////////
-//// INTERNAL CHANNEL
-////////////////////////////////////////////////////////////////////////////////
-class InternalChannel
-{
-  // emitStep will be bound to the constructor Emit, finishStep will be the constructor Finish.
-  // emit must be bound to an Effect producing function.
-  constructor (emitStep, finishStep, emit)
-  {
-    this.emitStep = emitStep;
-    this.finishStep = finishStep;
-    this.emit = emit;
-    this.requestId = -1;
-  }
-
-  setEmit (emit)
-  {
-    this.emit = emit;
-  }
-
-  nextRequestId ()
-  {
-    this.requestId = this.requestId + 1;
-    return this.requestId;
-  }
-
-  // Inform the server that this client shuts down.
-  // No other requests may follow this message.
-  close()
-  {
-    this.emit( this.finishStep({}) )();
-    this.emit = function()
-    {
-      throw( "This client has shut down!");
-    };
-  }
-
-  // Returns a promise for unsubscriber information of the form: {subject: req.subject, corrId: req.corrId}
-  send ( req )
-  {
-    const proxy = this;
-    const setter = req.reactStateSetter;
-    // Create a correlation identifier and store it in the request.
-    if ( !req.corrId )
-    {
-      req.corrId = this.nextRequestId();
-    }
-    // console.log( req );
-
-    // this.emit has Purescript type:
-    //    newtype Emitter m a r = Emitter (Step a r -> m Unit)
-    // where m is Effect.
-    // The Step a r is constructed by this.emitStep (which comes from Purescript as well).
-    // Hence, calling this.emit returns a Unit result (that we are not interested in here)
-    // in Effect. To actually compute that, we have to apply it (to zero arguments).
-    this.emit( this.emitStep(req) )();
-    // return a promise for the elementary data for unsubscribing.
-    return new Promise( function( resolver /*.rejecter*/)
-      {
-        resolver( {subject: req.subject, corrId: req.corrId} );
-      } );
-
-  }
-
-  unsubscribe(req)
-  {
-    this.send(
-      {request: "Unsubscribe", subject: req.subject, predicate: req.predicate, setterId: req.setterId}
-    );
-  }
-
-}
 
 ////////////////////////////////////////////////////////////////////////////////
 //// SHARED WORKER CHANNEL
@@ -738,6 +610,24 @@ class PerspectivesProxy
       },
       errorHandler
     );
+  }
+
+  // { request: "GetTableForm", subject: UserRoleType, predicate: ContextInstance, object: RoleType }
+  getTableForm( userRoleType, contextInstance, roleType, receiveValues, fireAndForget, errorHandler )
+  {
+    return this.send( 
+      { request: "GetTableForm"
+      , subject: userRoleType
+      , predicate: contextInstance
+      , object: roleType
+      , onlyOnce: !!fireAndForget
+      },
+      function (tableValueStrings)
+      {
+        return receiveValues(tableValueStrings.map( JSON.parse ));
+      },
+      errorHandler
+    )
   }
 
   getLocalRoleSpecialisation( localAspectName, contextInstance, receiveValues, fireAndForget, errorHandler )
@@ -1377,21 +1267,8 @@ class PerspectivesProxy
   }
 
 }
-const FIREANDFORGET = true;
-const CONTINUOUS = false;
-
-module.exports = {
-  PDRproxy: PDRproxy,
-  InternalChannelPromise: InternalChannelPromise,
-  SharedWorkerChannelPromise: SharedWorkerChannelPromise,
-  createRequestEmitterImpl: createRequestEmitterImpl,
-  retrieveRequestEmitterImpl: retrieveRequestEmitterImpl,
-  // createTcpConnectionToPerspectives: createTcpConnectionToPerspectives,
-  // createServiceWorkerConnectionToPerspectives: createServiceWorkerConnectionToPerspectives,
-  configurePDRproxy: configurePDRproxy,
-  FIREANDFORGET: true,
-  CONTINUOUS: false
-};
+export const FIREANDFORGET = true;
+export const CONTINUOUS = false;
 
 ////////////////////////////////////////////////////////////////////////////////
 //// CURSOR HANDLING
