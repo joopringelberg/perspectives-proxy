@@ -4,7 +4,6 @@
   "description": "Exposes perspectives-core.",
   "main": "dist/perspectives-proxy.js",
   "module": "dist/perspectives-proxy.js",
-  "types": "dist/perspectives-proxy.d.ts",
   "type": "module",
   "scripts": {
     "test": "echo \"Error: no test specified\" && exit 1",
