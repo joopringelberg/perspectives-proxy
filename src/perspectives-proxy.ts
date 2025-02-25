@@ -37,8 +37,7 @@ The PDRproxy promise is imported by all of the modules in perspectives-react tha
 //// CLIENT SIDE PROMISES
 ////////////////////////////////////////////////////////////////////////////////
 
-let pdrProxyResolver/*, pdrProxyRejecter*/;
-let sharedWorkerChannelResolver/*, sharedWorkerChannelRejecter*/;
+let pdrProxyResolver: (value: PerspectivesProxy | PromiseLike<PerspectivesProxy>) => void
 
 // This promise will resolve to an instance of PerspectivesProxy, with a SharedWorkerChannel that holds a port to the SharedWorker execution context,
 // or to the page execution context that hosts the PDR.
@@ -46,20 +45,11 @@ let sharedWorkerChannelResolver/*, sharedWorkerChannelRejecter*/;
 // turn up as 'output' of a Producer, ready to be consumed by some process.
 // The channel uses the emit function as a callback: when it has a request to send, it calls 'emit'
 // after wrapping the request in the appropriate constructor (usually the emitStep).
-export const PDRproxy = new Promise(
+export const PDRproxy: Promise<PerspectivesProxy> = new Promise(
   function (resolve/*, reject*/)
   {
     pdrProxyResolver = resolve;
     //pdrProxyRejecter = reject;
-  });
-
-// This promise will resolve to an instance of the the SharedWorkerChannel.
-// It is used by InPlace, running in the same javascript process as this proxy.
-export const SharedWorkerChannelPromise = new Promise(
-  function (resolve/*, reject*/)
-  {
-    sharedWorkerChannelResolver = resolve;
-    // sharedWorkerChannelRejecter = reject;
   });
 
 ////////////////////////////////////////////////////////////////////////////////
@@ -71,7 +61,10 @@ export const SharedWorkerChannelPromise = new Promise(
 // type TCPOptions opts = {port :: Port, host :: Host, allowHalfOpen :: Boolean | opts}
 // type Port = Int
 // type Host = String
-export function configurePDRproxy (channeltype, options)
+
+type Options = { pageHostingPDRPort: (pdr: any) => MessagePort };
+
+export function configurePDRproxy(channeltype: "internalChannel" | "sharedWorkerChannel" | "hostPageChannel", options: Options): void 
 {
   let sharedWorkerChannel;
   switch( channeltype )
@@ -85,12 +78,11 @@ export function configurePDRproxy (channeltype, options)
       break;
     case "hostPageChannel":
         import( "perspectives-core" ).then( pdr => {
-      // pageHostingPDRPort returns a MessageChannel as documented here: https://developer.mozilla.org/en-US/docs/Web/API/MessagePort.
-      sharedWorkerChannel = new SharedWorkerChannel( options.pageHostingPDRPort( pdr ) );
-       });
-       
-       sharedWorkerChannelResolver( sharedWorkerChannel );
-       pdrProxyResolver( new PerspectivesProxy( sharedWorkerChannel ) );
+        // pageHostingPDRPort returns a MessageChannel as documented here: https://developer.mozilla.org/en-US/docs/Web/API/MessagePort.
+        sharedWorkerChannel = new SharedWorkerChannel( options.pageHostingPDRPort( pdr ) );
+        sharedWorkerChannelResolver( sharedWorkerChannel );
+        pdrProxyResolver( new PerspectivesProxy( sharedWorkerChannel ) );
+        });
        break;
   }
 }
@@ -98,6 +90,19 @@ export function configurePDRproxy (channeltype, options)
 ////////////////////////////////////////////////////////////////////////////////
 //// REQUEST STRUCTURE
 ////////////////////////////////////////////////////////////////////////////////
+interface RequestRecord {
+  request?: string;
+  subject?: string;
+  predicate?: string;
+  object?: any;
+  contextDescription?: any;
+  rolDescription?: any;
+  authoringRole?: string;
+  onlyOnce?: boolean;
+  reactStateSetter?: (response: any) => void;
+  corrId?: number;
+}
+
 const defaultRequest =
   {
     request: "WrongRequest",
@@ -105,22 +110,78 @@ const defaultRequest =
     predicate: "",
     object: "",
     reactStateSetter: function(){},
-    corrId: "",
+    corrId: 0,
     contextDescription: {},
     onlyOnce: false
-  };
+  } as RequestRecord;
 
+/////////////////////////////////////////////////////////////////////////////////////////
+// PDRTYPES
+/////////////////////////////////////////////////////////////////////////////////////////
+type RuntimeOptions = {
+  // Default: true. Should be false when someone installs MyContexts on a second device.
+  isFirstInstallation: boolean;
+  // Default: null. Provide a value to test setup of an experimental new System version.
+  useSystemVersion: string | null;
+  // Default: the CryptoKey object that has been created on setting up the installation. This is not extractable.
+  privateKey?: CryptoKey;
+  // Default: the CryptoKey object that has been created on setting up the installation. This is extractable.
+  publicKey?: CryptoKey;
+  // Default: the package number taken from package.json
+  myContextsVersion: string;
+};
 
+type PouchdbUser = {
+  systemIdentifier: string;  // the schemaless string
+  perspectivesUser: string;  // the schemaless string
+  userName: string;          // this MAY be equal to perspectivesUser but it is not required.
+  password?: string;         // Optional field
+  couchdbUrl?: string;       // Optional field
+};
+
+type Response = ErrorResponse | ResultResponse | WorkerResponse;
+
+type ErrorResponse = {
+  responseType: "APIerror";
+  corrId: number;
+  error: string;
+};
+
+type ResultResponse = {
+  responseType: "APIresult";
+  corrId: number;
+  result: string[];
+};
+
+type WorkerResponse = {
+  responseType: "WorkerResponse";
+  serviceWorkerMessage: "channelId" | "pdrStarted" | "isUserLoggedIn" | "runPDR" | "createAccount" | "resetAccount" | "reCreateInstances" | "recompileLocalModels" | "removeAccount";
+  channelId: number;
+  pdrStarted: boolean;  // true if the PDR has started.
+  isUserLoggedIn: boolean;  // true if the user has logged in before.
+  createSuccesful: boolean;  // true if the account has been created.
+  resetSuccesful: boolean;  // true if the account has been reset.
+  reCreateSuccesful: boolean;  // true if the instances have been recreated.
+  recompileSuccesful: boolean;  // true if the local models have been recompiled.
+  removeSuccesful: boolean;  // true if the account has been removed.
+};
 
 ////////////////////////////////////////////////////////////////////////////////
 //// SHARED WORKER CHANNEL
 //// This code will be executed by the client!
 //// The SharedWorkerChannel is a proxy for the ServiceWorker for the client.
 ////////////////////////////////////////////////////////////////////////////////
+
 class SharedWorkerChannel
 {
+  port: MessagePort;
+  requestId: number;
+  valueReceivers: { [key: string]: ((data: any) => void) | undefined };
+  channelIdResolver: ((value: number | PromiseLike<number>) => void) | undefined;
+  channelId: Promise<number>;
+
   // port is a MessagePort as documented here: https://developer.mozilla.org/en-US/docs/Web/API/MessagePort.
-  constructor( port )
+  constructor( port: MessagePort )
   {
     const serviceWorkerChannel = this;
     this.requestId = -1;
@@ -141,23 +202,23 @@ class SharedWorkerChannel
   // The sharedworker or pageworker sends messages of various types.
   // Among them are responses received by the core.
   //
-  handleWorkerResponse (e)
+  handleWorkerResponse (e : MessageEvent<Response>)
   {
-    if (e.data.error)
+    if (e.data.responseType === "APIerror")
     {
       // {corrId: i, error: s} where s is is a String, i an int.
       // we just pass errors on.
-      this.valueReceivers[ e.data.corrId ]( e.data );
+      this.valueReceivers[ e.data.corrId ]!( e.data );
     }
-    else if ( e.data.result )
+    else if ( e.data.responseType === "APIresult" )
     {
       // {corrId: i, result: s} where s is an Array of String, i an int.
       // pass the result on
-      this.valueReceivers[ e.data.corrId ]( e.data );
+      this.valueReceivers[ e.data.corrId ]!( e.data );
     }
     // Then we have a category of incoming messages that originate in the service worker itself,
     // often in response to a specific request sent by the proxy.
-    else if ( e.data.serviceWorkerMessage )
+    else if ( e.data.responseType === "WorkerResponse" )
     {
       // {serviceWorkerMessage: m, <field>: <value>} where m is a string. The object may contain any number of other fields, depending on the type of message (i.e. the value of m).
       switch( e.data.serviceWorkerMessage )
@@ -167,75 +228,75 @@ class SharedWorkerChannel
           // As soon as the SharedWorker receives a port from this proxy, it will return the channels id.
           // {serviceWorkerMessage: "channelId", channelId: i} where i is a multiple of a million.
           // Handle the port identification message that is sent by the service worker.
-          this.channelIdResolver( e.data.channelId );
+          this.channelIdResolver!( e.data.channelId );
           break;
         case "pdrStarted":
-          this.valueReceivers.pdrStarted( e.data.pdrStarted );
+          this.valueReceivers.pdrStarted!( e.data.pdrStarted );
           break;
         case "isUserLoggedIn":
           // {serviceWorkerMessage: "isUserLoggedIn", isUserLoggedIn: b} where b is a boolean.
-          this.valueReceivers.isUserLoggedIn( e.data.isUserLoggedIn );
+          this.valueReceivers.isUserLoggedIn!( e.data.isUserLoggedIn );
           break;
         case "resetAccount":
           // {serviceWorkerMessage: "resetAccount", resetSuccesful: b} where b is a boolean.
-          this.valueReceivers.resetAccount( e.data.resetSuccesful );
+          this.valueReceivers.resetAccount!( e.data.resetSuccesful );
           break;
         case "reCreateInstances":
           // {serviceWorkerMessage: "reCreateInstances", reCreateSuccesful: b} where b is a boolean.
-          this.valueReceivers.reCreateInstances( e.data.reCreateSuccesful );
+          this.valueReceivers.reCreateInstances!( e.data.reCreateSuccesful );
           break;
         case "recompileLocalModels":
         // {serviceWorkerMessage: "recompileLocalModels", recompileSuccesful: b} where b is a boolean.
-        this.valueReceivers.recompileLocalModels( e.data.recompileSuccesful );
+        this.valueReceivers.recompileLocalModels!( e.data.recompileSuccesful );
         break;
         case "removeAccount":
           // {serviceWorkerMessage: "removeAccount", removeSuccesful: b} where b is a boolean.
-          this.valueReceivers.removeAccount( e.data.removeSuccesful );
+          this.valueReceivers.removeAccount!( e.data.removeSuccesful );
           break;
         case "runPDR":
           // {serviceWorkerMessage: "runPDR", error: e }
-          this.valueReceivers.runPDR( e );
+          this.valueReceivers.runPDR!( e );
           break;
         case "createAccount":
           // {serviceWorkerMessage: "createAccount", createSuccesful: {success :: Boolean, reason :: Nullable String}}.
-          this.valueReceivers.createAccount( e.data.createSuccesful );
+          this.valueReceivers.createAccount!( e.data.createSuccesful );
           break;
       }
     }
   }
 
   // This promise will resolve regardless of whether the PDR has started or not.
-  pdrStarted ()
+  pdrStarted () : Promise<boolean>
   {
     const proxy = this;
     const p = new Promise(
       function(resolver/*, rejecter*/)
       {
-        proxy.valueReceivers.pdrStarted = function(hasStarted)
+        proxy.valueReceivers.pdrStarted = function(hasStarted : boolean)
           {
             proxy.valueReceivers.pdrStarted = undefined;
             resolver( hasStarted );
           };
       }
-    );
+    ) as Promise<boolean>;
     proxy.channelId.then( channelId => proxy.port.postMessage( {proxyRequest: "pdrStarted", channelId } ) );
     return p;
   }
 
   // Returns a promise for a boolean value, reflecting whether the end user has logged in before or not.
-  isUserLoggedIn ()
+  isUserLoggedIn () : Promise<boolean>
   {
     const proxy = this;
     const p = new Promise(
       function(resolver/*, rejecter*/)
       {
-        proxy.valueReceivers.isUserLoggedIn = function(isLoggedIn)
+        proxy.valueReceivers.isUserLoggedIn = function(isLoggedIn : boolean)
           {
             proxy.valueReceivers.isUserLoggedIn = undefined;
             resolver( isLoggedIn );
           };
       }
-    );
+    ) as Promise<boolean>;
     proxy.channelId.then( channelId => proxy.port.postMessage( {proxyRequest: "isUserLoggedIn", channelId } ) );
     return p;
   }
@@ -244,7 +305,7 @@ class SharedWorkerChannel
   // Runs the PDR, if a value is returned it will be an error message.
   // {serviceWorkerMessage: "runPDR", startSuccesful: success }
   // {serviceWorkerMessage: "runPDR", error: e }
-  runPDR (username, pouchdbuser, options)
+  runPDR (username : string, pouchdbuser : PouchdbUser, options: RuntimeOptions) : Promise<boolean>
   {
     const proxy = this;
     const p = new Promise(
@@ -263,12 +324,12 @@ class SharedWorkerChannel
             }
           };
       }
-    );
+    ) as Promise<boolean>;
     proxy.channelId.then( channelId => this.port.postMessage({proxyRequest: "runPDR", username, pouchdbuser, options, channelId }));
     return p;
   }
 
-  createAccount (perspectivesUser, pouchdbuser, runtimeOptions, optionalIdentityDocument)
+  createAccount (perspectivesUser : string, pouchdbuser : PouchdbUser, runtimeOptions : RuntimeOptions, optionalIdentityDocument : any) : Promise<boolean>  
   {
     const proxy = this;
     const p = new Promise(
@@ -288,12 +349,12 @@ class SharedWorkerChannel
             }
           };
       }
-    );
+    ) as Promise<boolean>;
     proxy.channelId.then( channelId => this.port.postMessage( {proxyRequest: "createAccount", perspectivesUser, pouchdbuser, channelId, runtimeOptions, identityDocument: optionalIdentityDocument ? optionalIdentityDocument : null } ) );
     return p;
   }
 
-  resetAccount (username, pouchdbuser, options)
+  resetAccount (username : string, pouchdbuser : PouchdbUser, options : RuntimeOptions) : Promise<boolean>
   {
     const proxy = this;
     const p = new Promise(
@@ -305,12 +366,12 @@ class SharedWorkerChannel
             resolver( result );
           };
       }
-    );
+    ) as Promise<boolean>;
     proxy.channelId.then( channelId => this.port.postMessage( {proxyRequest: "resetAccount", username, pouchdbuser, options, channelId } ) );
     return p;
   }
 
-  reCreateInstances (pouchdbuser, options)
+  reCreateInstances (pouchdbuser : PouchdbUser, options : RuntimeOptions) : Promise<boolean>
   {
     const proxy = this;
     const p = new Promise(
@@ -322,12 +383,12 @@ class SharedWorkerChannel
             resolver( result );
           };
       }
-    );
+    ) as Promise<boolean>;
     proxy.channelId.then( channelId => this.port.postMessage( {proxyRequest: "reCreateInstances", pouchdbuser, options, channelId } ) );
     return p;
   }
 
-  recompileLocalModels (pouchdbuser)
+  recompileLocalModels (pouchdbuser : PouchdbUser) : Promise<boolean>
   {
     const proxy = this;
     const p = new Promise(
@@ -339,12 +400,12 @@ class SharedWorkerChannel
             resolver( result );
           };
       }
-    );
+    ) as Promise<boolean>;
     proxy.channelId.then( channelId => this.port.postMessage( {proxyRequest: "recompileLocalModels", pouchdbuser, channelId } ) );
     return p;
   }
 
-  removeAccount (username, pouchdbuser)
+  removeAccount (username : string, pouchdbuser : PouchdbUser ) : Promise<boolean>
   {
     const proxy = this;
     const p = new Promise(
@@ -356,7 +417,7 @@ class SharedWorkerChannel
             resolver( result );
           };
       }
-    );
+    ) as Promise<boolean>;
     proxy.channelId.then( channelId => this.port.postMessage( {proxyRequest: "removeAccount", username, pouchdbuser, channelId } ) );
     return p;
   }
@@ -369,13 +430,13 @@ class SharedWorkerChannel
     this.port.postMessage({proxyRequest: "Close"});
   }
 
-  unsubscribe(req)
+  unsubscribe(req : RequestRecord)
   {
     // Send a message that will make the internal channel in the Service Worker close.
     this.port.postMessage( {proxyRequest: "unsubscribe", request: req } );
   }
 
-  nextRequestId ()
+  nextRequestId () : Promise<number>
   {
     const proxy = this;
     return this.channelId.then(
@@ -388,7 +449,7 @@ class SharedWorkerChannel
   }
 
   // Returns a promise for unsuscriber information of the form: {subject: req.subject, corrId: req.corrId}
-  send ( req )
+  send ( req : RequestRecord ) : Promise<Unsubscriber>
   {
     const proxy = this;
     return this.nextRequestId().then(
@@ -410,16 +471,34 @@ class SharedWorkerChannel
         // return the elementary data for unsubscribing.
         return {subject: req.subject, corrId: req.corrId};
       }
-    );
+    ) as Promise<{ subject: string; corrId: string }>;
   }
 
 }
+
+type Unsubscriber = { subject: string; corrId: string };
+
+let sharedWorkerChannelResolver: (value: SharedWorkerChannel | PromiseLike<SharedWorkerChannel>) => void/*, sharedWorkerChannelRejecter*/;
+
+// This promise will resolve to an instance of the the SharedWorkerChannel.
+// It is used by InPlace, running in the same javascript process as this proxy.
+export const SharedWorkerChannelPromise: Promise<SharedWorkerChannel> = new Promise(
+  function (resolve/*, reject*/)
+  {
+    sharedWorkerChannelResolver = resolve;
+    // sharedWorkerChannelRejecter = reject;
+  });
+
+
 ////////////////////////////////////////////////////////////////////////////////
 //// PERSPECTIVESPROXY
 ////////////////////////////////////////////////////////////////////////////////
 class PerspectivesProxy
 {
-  constructor (channel)
+  channel: SharedWorkerChannel;
+  cursor: Cursor;
+
+  constructor (channel : SharedWorkerChannel)
   {
     this.channel = channel;
     this.cursor = new Cursor();
@@ -434,16 +513,16 @@ class PerspectivesProxy
 
   // Returns a promise for unsuscriber information of the form: {subject: req.subject, corrId: req.corrId}
   // that can be used by the caller to unsubscribe from the core dependency network.
-  send (req, receiveValues, errorHandler)
+  send (req: RequestRecord, receiveValues : valueReceiver, errorHandler : errorHandler) : Promise<Unsubscriber>
   {
     const cursor = this.cursor;
     // Handle errors here. Use `errorHandler` if provided by the PerspectivesProxy method.
     // Log errors to the console anyway for the developer.
-    const handleErrors = function(response) // response = PerspectivesApiTypes.ResponseRecord
+    const handleErrors = function(response : Response) // response = PerspectivesApiTypes.ResponseRecord
     {
       // Restore cursor shape
       cursor.restore();
-      if (response.error)
+      if (response.responseType === "APIerror")
       {
         console.warn( "This request:\n" + JSON.stringify(req) + "\n results in this error: \n" + response.error );
         if (errorHandler)
@@ -451,7 +530,7 @@ class PerspectivesProxy
           errorHandler( response.error )
         }
       }
-      else
+      else if (response.responseType === "APIresult")
       {
         receiveValues(response.result);
       }
@@ -472,7 +551,7 @@ class PerspectivesProxy
   }
 
   // unsubscribe from the channel.
-  unsubscribe (req)
+  unsubscribe (req : RequestRecord)
   {
     this.channel.unsubscribe(req);
   }
@@ -485,14 +564,8 @@ class PerspectivesProxy
   //// immediately.
   ///////////////////////////////////////////////////////////////////////////////////////
 
-  // getRolBinding (contextID, rolName, receiveValues)
-  // {
-  //   return this.send(
-  //     {request: "GetRolBinding", subject: contextID, predicate: rolName},
-  //     receiveValues);
-  // }
   // rolName must be qualified but may use default prefixes.
-  getRol (contextID, rolName, receiveValues, fireAndForget, errorHandler)
+  getRol (contextID : ContextID, rolName : RolName, receiveValues : valueReceiver, fireAndForget : SubscriptionType, errorHandler : errorHandler)
   {
     return this.send(
       {request: "GetRol", subject: contextID, predicate: rolName, onlyOnce: !!fireAndForget},
@@ -500,7 +573,7 @@ class PerspectivesProxy
       errorHandler);
   }
 
-  getUnqualifiedRol (contextID, localRolName, receiveValues, fireAndForget, errorHandler)
+  getUnqualifiedRol (contextID : ContextID, localRolName : RolName, receiveValues : valueReceiver, fireAndForget : SubscriptionType, errorHandler : errorHandler)
   {
     return this.send(
       {request: "GetUnqualifiedRol", subject: contextID, predicate: localRolName, onlyOnce: !!fireAndForget},
@@ -508,7 +581,7 @@ class PerspectivesProxy
       errorHandler);
   }
 
-  getProperty (rolID, propertyName, roleType, receiveValues, fireAndForget, errorHandler)
+  getProperty (rolID : RoleInstance, propertyName : PropertyType, roleType  : RoleType, receiveValues : valueReceiver, fireAndForget : SubscriptionType, errorHandler : errorHandler)
   {
     return this.send(
       {request: "GetProperty", subject: rolID, predicate: propertyName, object: roleType, onlyOnce: !!fireAndForget},
@@ -516,7 +589,7 @@ class PerspectivesProxy
       errorHandler);
   }
 
-  getPropertyFromLocalName (rolID, propertyName, roleType, receiveValues, fireAndForget, errorHandler)
+  getPropertyFromLocalName (rolID : RoleInstance, propertyName : PropertyType, roleType  : RoleType, receiveValues : valueReceiver, fireAndForget : SubscriptionType, errorHandler : errorHandler)
   {
     return this.send(
       {request: "GetPropertyFromLocalName", subject: rolID, predicate: propertyName, object: roleType, onlyOnce: !!fireAndForget},
@@ -525,7 +598,7 @@ class PerspectivesProxy
     );
   }
 
-  getBinding (rolID, receiveValues, fireAndForget, errorHandler)
+  getBinding (rolID : RoleInstance, receiveValues : valueReceiver, fireAndForget : SubscriptionType, errorHandler : errorHandler)
   {
     return this.send(
       {request: "GetBinding", subject: rolID, predicate: "", onlyOnce: !!fireAndForget},
@@ -536,7 +609,7 @@ class PerspectivesProxy
   // Note: this function is currently not in use.
   // The lexical context of the roleType can be used by providing the empty string
   // as argument for parameter contextType.
-  getRoleBinders (rolID, contextType, roleType, receiveValues, fireAndForget, errorHandler)
+  getRoleBinders (rolID : RoleInstance, contextType : ContextType, roleType  : RoleType, receiveValues : valueReceiver, fireAndForget : SubscriptionType, errorHandler : errorHandler)
   {
     return this.send(
       {request: "GetRoleBinders", subject: rolID, predicate: roleType, object: contextType, onlyOnce: !!fireAndForget},
@@ -544,7 +617,7 @@ class PerspectivesProxy
       errorHandler);
   }
 
-  // getUnqualifiedRoleBinders (rolID, localRolName, receiveValues)
+  // getUnqualifiedRoleBinders (rolID : RoleInstance, localRolName, receiveValues)
   // {
   //   return this.send(
   //     {request: "GetUnqualifiedRoleBinders", subject: rolID, predicate: localRolName},
@@ -552,7 +625,7 @@ class PerspectivesProxy
   // }
 
   // Returns an array of Role Types.
-  getMeForContext (externalRoleInstance, receiveValues, fireAndForget, errorHandler)
+  getMeForContext (externalRoleInstance : RoleInstance, receiveValues : valueReceiver, fireAndForget : SubscriptionType, errorHandler : errorHandler)
   {
     return this.send(
       {request: "GetMeForContext", subject: externalRoleInstance, onlyOnce: !!fireAndForget},
@@ -561,7 +634,7 @@ class PerspectivesProxy
     );
   }
 
-  getPerspectives (contextInstance, userRoleType, receiveValues, fireAndForget, errorHandler)
+  getPerspectives (contextInstance : ContextInstance, userRoleType : UserRoleType, receiveValues : valueReceiver, fireAndForget : SubscriptionType, errorHandler : errorHandler)
   {
     return this.send(
       { request: "GetPerspectives"
@@ -578,7 +651,7 @@ class PerspectivesProxy
   }
 
   // { request: "GetPerspective", subject: PerspectiveObjectRoleType OPTIONAL, predicate: RoleInstanceOfContext }
-  getPerspective (roleInstanceOfContext, perspectiveObjectRoleType /*OPTIONAL*/, receiveValues, fireAndForget, errorHandler)
+  getPerspective (roleInstanceOfContext : RoleInstance, perspectiveObjectRoleType : RoleType /*OPTIONAL*/, receiveValues : valueReceiver, fireAndForget : SubscriptionType, errorHandler : errorHandler)
   {
     return this.send(
       { request: "GetPerspective"
@@ -595,7 +668,7 @@ class PerspectivesProxy
   }
 
   // { request: "GetScreen", subject: UserRoleType, predicate: ContextType, object: ContextInstance }
-  getScreen(userRoleType, contextInstance, contextType, receiveValues, fireAndForget, errorHandler)
+  getScreen(userRoleType : UserRoleType, contextInstance : ContextInstance, contextType : ContextType, receiveValues : valueReceiver, fireAndForget : SubscriptionType, errorHandler : errorHandler)
   {
     return this.send(
       { request: "GetScreen"
@@ -613,7 +686,7 @@ class PerspectivesProxy
   }
 
   // { request: "GetTableForm", subject: UserRoleType, predicate: ContextInstance, object: RoleType }
-  getTableForm( userRoleType, contextInstance, roleType, receiveValues, fireAndForget, errorHandler )
+  getTableForm( userRoleType : UserRoleType, contextInstance : ContextInstance, roleType  : RoleType, receiveValues : valueReceiver, fireAndForget : SubscriptionType, errorHandler : errorHandler )
   {
     return this.send( 
       { request: "GetTableForm"
@@ -630,7 +703,7 @@ class PerspectivesProxy
     )
   }
 
-  getLocalRoleSpecialisation( localAspectName, contextInstance, receiveValues, fireAndForget, errorHandler )
+  getLocalRoleSpecialisation( localAspectName : string, contextInstance : ContextInstance, receiveValues : valueReceiver, fireAndForget : SubscriptionType, errorHandler : errorHandler )
   {
     return this.send(
       { request: "GetLocalRoleSpecialisation"
@@ -642,7 +715,7 @@ class PerspectivesProxy
     );
   }
 
-  getRoleName( rid, receiveValues, fireAndForget, errorHandler )
+  getRoleName( rid : RoleInstance, receiveValues : valueReceiver, fireAndForget : SubscriptionType, errorHandler : errorHandler )
   {
     this.send(
       { request: "GetRoleName"
@@ -655,7 +728,7 @@ class PerspectivesProxy
   }
 
   // We haven't made this promisebased because the binding can change, even though its type cannot.
-  getBindingType (rolID, receiveValues, fireAndForget, errorHandler)
+  getBindingType (rolID : RoleInstance, receiveValues : valueReceiver, fireAndForget : SubscriptionType, errorHandler : errorHandler)
   {
     return this.send(
       {request: "GetBindingType", subject: rolID, predicate: "", onlyOnce: !!fireAndForget},
@@ -663,7 +736,7 @@ class PerspectivesProxy
       errorHandler);
   }
 
-  matchContextName( name, receiveValues, fireAndForget, errorHandler )
+  matchContextName( name : string, receiveValues : valueReceiver, fireAndForget : SubscriptionType, errorHandler : errorHandler )
   {
     return this.send(
       {request: "MatchContextName", subject: name, onlyOnce: !!fireAndForget},
@@ -674,7 +747,7 @@ class PerspectivesProxy
   // Returns {roleInstance, firstname, lastname, avatar [OPTIONAL]}
   // rolID is the role that has the Chat properties; 
   // propertyId is one of the Chat properties (messages or media) (by construction it must be Enumerated)
-  getChatParticipants( rolID, propertyId, receiveValues, fireAndForget, errorHandler)
+  getChatParticipants( rolID : RoleInstance, propertyId : PropertyType, receiveValues : valueReceiver, fireAndForget : SubscriptionType, errorHandler : errorHandler)
   {
     return this.send(
       {request: "GetChatParticipants", subject: rolID, predicate: propertyId, onlyOnce: !!fireAndForget},
@@ -690,7 +763,7 @@ class PerspectivesProxy
   // Where (local)RolName identifies the role in <contexttype> whose binding specification we want to compare with <binding>.
   // A version that returns a promise for a boolean value. NOTE: the promise can be fulfilled with `false`, meaning the binding cannot be made.
   // This is different then failure, meaning that something went wrong in computing.
-  checkBindingP (roleName, rolInstance)
+  checkBindingP (roleName : RoleType, rolInstance : RoleInstance)
   {
     const proxy = this;
     return new Promise(function(resolver, rejecter)
@@ -742,7 +815,7 @@ class PerspectivesProxy
   // }
   // Returns a promise for a stringified object with the actions that can be performed in the context.
   // The keys are the action names taken from the model; the values are their translations in the current language.
-  getContextActions(myRoleType, contextInstance)
+  getContextActions(myRoleType : UserRoleType, contextInstance : ContextInstance)
   {
     const proxy = this;
     return new Promise(function (resolver, rejecter)
@@ -765,7 +838,7 @@ class PerspectivesProxy
     })
   }
 
-  getAllMyRoleTypes(externalRoleInstance)
+  getAllMyRoleTypes(externalRoleInstance : RoleInstance)
   {
     const proxy = this;
     return new Promise(function (resolver, rejecter)
@@ -778,7 +851,7 @@ class PerspectivesProxy
       })
   }
 
-  getViewProperties (rolType, viewName)
+  getViewProperties (rolType : RoleType, viewName : string)
   {
     const proxy = this;
     return new Promise(function (resolver, rejecter)
@@ -790,7 +863,7 @@ class PerspectivesProxy
         });
   }
 
-  getContextType (contextID)
+  getContextType (contextID : ContextID)
   {
     const proxy = this;
     return new Promise(function (resolver, rejecter)
@@ -802,7 +875,7 @@ class PerspectivesProxy
       });
   }
 
-  getRolContext (rolID)
+  getRolContext (rolID : RoleInstance)
   {
     const proxy = this;
     return new Promise(function (resolver, rejecter)
@@ -814,7 +887,7 @@ class PerspectivesProxy
       });
   }
 
-  getRolType (rolID)
+  getRolType (rolID : RoleInstance)
   {
     const proxy = this;
     return new Promise(function (resolver, rejecter)
@@ -827,7 +900,7 @@ class PerspectivesProxy
   }
 
   // RoleInContext | ContextRole | ExternalRole | UserRole | BotRole
-  getRoleKind (rolID)
+  getRoleKind (rolID : RoleInstance)
   {
     const proxy = this;
     return new Promise(function (resolver, rejecter)
@@ -839,7 +912,7 @@ class PerspectivesProxy
       });
   }
 
-  getUnqualifiedRolType (contextType, localRolName)
+  getUnqualifiedRolType (contextType : ContextType, localRolName : string)
   {
     const proxy = this;
     return new Promise(function (resolver, rejecter)
@@ -851,7 +924,7 @@ class PerspectivesProxy
       });
   }
 
-  getFile (roleInstance, propertyName)
+  getFile (roleInstance : RoleInstance, propertyName : PropertyType)
   {
     const proxy = this;
     return new Promise( function( resolver, rejecter)
@@ -865,7 +938,7 @@ class PerspectivesProxy
   }
 
   // Returns a promise for the pubic address of the context - if any.
-  getPublicUrl (contextInstance)
+  getPublicUrl (contextInstance : ContextInstance)
   {
     const proxy = this;
     return new Promise( function( resolver, rejecter )
@@ -908,7 +981,7 @@ class PerspectivesProxy
   
   // The user role instance in the context of the given role instance that is ultimately filled by the PerspectivesUsers instance that represents
   // the natural person owning this installation in the Perspectives Universe.
-  getMeInContext ( roleInstance )
+  getMeInContext ( roleInstance : RoleInstance)
     {
       const proxy = this;
       return new Promise( function( resolver, rejecter )
@@ -960,7 +1033,7 @@ class PerspectivesProxy
   // object must be the type of the context to disambiguate the roleType name in.
   // subject must be the context instance to add a role instance to.
 
-  createContext (contextDescription, roleType, contextIdToAddRoleInstanceTo, myroletype)
+  createContext (contextDescription : ContextSerializationRecord, roleType  : RoleType, contextIdToAddRoleInstanceTo : ContextInstance, myroletype  : UserRoleType)
   {
     const proxy = this;
     return new Promise(function (resolver, rejecter)
@@ -976,7 +1049,7 @@ class PerspectivesProxy
   // Create a context, bound to the given role instance.
   // createContext_( <contextDescription>, <roleinstance>, ...)
   // Either throws an error, or returns an array with a context identifier.
-  createContext_ (contextDescription, roleInstance, myroletype)
+  createContext_ (contextDescription : ContextSerializationRecord, roleInstance: RoleInstance, myroletype  : UserRoleType)
   {
     const proxy = this;
     return new Promise(function (resolver, rejecter)
@@ -990,7 +1063,7 @@ class PerspectivesProxy
   }
 
   // Either throws an error, or returns an array of context identifiers.
-  importContexts (contextDescription)
+  importContexts (contextDescription : ContextSerializationRecord)
   {
     const proxy = this;
     return new Promise(function (resolver, rejecter)
@@ -1005,7 +1078,7 @@ class PerspectivesProxy
 
   // Either throws an error, or returns an empty array.
   // Notice we re-use the contextDescription field.
-  importTransaction (transaction)
+  importTransaction (transaction : any)
   {
     const proxy = this;
     return new Promise(function (resolver, rejecter)
@@ -1019,7 +1092,7 @@ class PerspectivesProxy
   }
 
   // value is just a single string!
-  setProperty (rolID, propertyName, value, myroletype)
+  setProperty (rolID : RoleInstance, propertyName  : PropertyType, value : Value, myroletype  : UserRoleType)
   {
     const proxy = this;
     return new Promise(function (resolver, rejecter)
@@ -1032,7 +1105,7 @@ class PerspectivesProxy
       });
   }
 
-  addProperty (rolID, propertyName, value, myroletype)
+  addProperty (rolID : RoleInstance, propertyName  : PropertyType, value : Value, myroletype  : UserRoleType)
   {
     const proxy = this;
     return new Promise(function (resolver, rejecter)
@@ -1046,8 +1119,8 @@ class PerspectivesProxy
   }
 
   // value is just a single string!
-  // saveFile (PerspectivesFileShape, File, myroletype)
-  saveFile( perspectivesFile, file, myroletype)
+  // saveFile (PerspectivesFileShape, File, myroletype  : UserRoleType)
+  saveFile( perspectivesFile : PerspectivesFile, file : File, myroletype  : UserRoleType)
   {
     const proxy = this;
     return file.arrayBuffer().then(
@@ -1057,7 +1130,7 @@ class PerspectivesProxy
         return new Promise(function (resolver, rejecter)
         {
           return proxy.send(
-            {request: "SaveFile", subject: perspectivesFile, contextDescription: buf, authoringRole: myroletype, onlyOnce: true}
+            {request: "SaveFile", subject: JSON.stringify( perspectivesFile ), contextDescription: buf, authoringRole: myroletype, onlyOnce: true}
             , resolver
             , rejecter
             );
@@ -1066,7 +1139,7 @@ class PerspectivesProxy
     );
   }
 
-  deleteProperty (rolID, propertyName, myroletype)
+  deleteProperty (rolID : RoleInstance, propertyName  : PropertyType, myroletype  : UserRoleType)
   {
     const proxy = this;
     return new Promise(function (resolver, rejecter)
@@ -1088,7 +1161,7 @@ class PerspectivesProxy
   //   	  }
   //   , authoringRole
   //   ...}
-  action (objectRoleInstance, contextInstance, perspectiveId, actionName, authoringRole)
+  action (objectRoleInstance : RoleInstance, contextInstance : ContextID, perspectiveId : string, actionName : string, authoringRole : string)
   {
     const proxy = this;
     const req = { request: "Action"
@@ -1116,7 +1189,7 @@ class PerspectivesProxy
   // , predicate: String // action identifier
   // , object: ContextId
   // }
-  contextAction( contextid, myRoleType, actionName)
+  contextAction( contextid : ContextInstance, myRoleType : UserRoleType, actionName : string)
   {
     const proxy = this;
     return new Promise(function (resolver, rejecter)
@@ -1128,7 +1201,7 @@ class PerspectivesProxy
       });
   }
 
-  removeBinding (rolID, myroletype)
+  removeBinding (rolID : RoleInstance, myroletype  : UserRoleType)
   {
     const proxy = this;
     return new Promise(function (resolver, rejecter)
@@ -1142,7 +1215,7 @@ class PerspectivesProxy
   }
 
   // remove rolID
-  removeRol (rolName, rolID, myroletype)
+  removeRol (rolName : RolName, rolID : RoleInstance, myroletype  : UserRoleType)
   {
     const proxy = this;
     return new Promise(function (resolver, rejecter)
@@ -1159,7 +1232,7 @@ class PerspectivesProxy
   // rolName must be qualified.
   // remove rolID.
   // rolName must be the authorized role type (the ContextRole type that is filled and that will be removed.)
-  removeContext (rolID, rolName, myroletype)
+  removeContext (rolID: RoleInstance, rolName : RolName, myroletype  : UserRoleType)
   {
     const proxy = this;
     return new Promise(function (resolver, rejecter)
@@ -1173,7 +1246,7 @@ class PerspectivesProxy
   }
 
   // Currently not used!
-  deleteRole (contextID, rolName, myroletype )
+  deleteRole (contextID : ContextID, rolName : RolName, myroletype : UserRoleType)
   {
     const proxy = this;
     return new Promise(function (resolver, rejecter)
@@ -1186,7 +1259,7 @@ class PerspectivesProxy
       });
   }
 
-  bind (contextinstance, localRolName, contextType, rolDescription, myroletype )
+  bind (contextinstance : ContextInstance, localRolName : RolName, contextType : ContextType, rolDescription : RolSerialization, myroletype : UserRoleType)
   {
     const proxy = this;
     return new Promise(function (resolver, rejecter)
@@ -1199,7 +1272,7 @@ class PerspectivesProxy
       });
   }
 
-  bind_ (filledRole, filler, myroletype)
+  bind_ (filledRole : RoleInstance, filler : RoleInstance, myroletype  : UserRoleType)
   {
     const proxy = this;
     return new Promise(function (resolver, rejecter)
@@ -1214,7 +1287,7 @@ class PerspectivesProxy
 
   // We have room for checkBinding_( <binder>, <binding>, [() -> undefined] )
 
-  createRole (contextinstance, rolType, myroletype)
+  createRole (contextinstance : ContextInstance, rolType : RoleType, myroletype  : UserRoleType)
   {
     const proxy = this;
     return new Promise(function (resolver, rejecter)
@@ -1227,7 +1300,7 @@ class PerspectivesProxy
       });
   }
 
-  setPreferredUserRoleType( externalRoleId, userRoleName )
+  setPreferredUserRoleType( externalRoleId : ExternalRoleType, userRoleName : UserRoleType )
   {
     const proxy = this;
     return new Promise(function (resolver, rejecter)
@@ -1253,7 +1326,7 @@ class PerspectivesProxy
       });
   }
 
-  evaluateRoleState( rolinstance )
+  evaluateRoleState( rolinstance : RoleInstance)
   {
     const proxy = this;
     return new Promise(function (resolver, rejecter)
@@ -1269,6 +1342,47 @@ class PerspectivesProxy
 }
 export const FIREANDFORGET = true;
 export const CONTINUOUS = false;
+
+type SubscriptionType = boolean
+type valueReceiver = (value: any) => void;
+type errorHandler = (error: string) => void;
+type ContextID = string;
+type RolName = string;
+type localRolName = string;
+type ContextType = string;
+type RoleType = string;
+type RoleInstance = string;
+type ContextInstance = string;
+type UserRoleType = string;
+type ContextRoleType = string;
+type ExternalRoleType = string;
+type PropertyType = string;
+type Value = string;
+
+type ContextSerializationRecord =
+  { id? : string
+  , prototype? : ContextID
+  , ctype : ContextType
+  , rollen: Record<RoleInstance, RolSerialization>
+  , externeProperties : PropertySerialization
+}
+
+type RolSerialization =
+  { id? : string
+  , properties : PropertySerialization
+  , binding? : string
+  }
+
+type PropertySerialization = { [key: string]: Value[] }
+
+export type PerspectivesFile = {
+  fileName: string;
+  propertyType: string;
+  mimeType: string;
+  database?: string;
+  roleFileName: string;
+};
+
 
 ////////////////////////////////////////////////////////////////////////////////
 //// CURSOR HANDLING

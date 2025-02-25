@@ -8,9 +8,9 @@
   "type": "module",
   "scripts": {
     "test": "echo \"Error: no test specified\" && exit 1",
-    "build": "webpack",
-    "watch": "webpack --watch",
-    "copy": "cp src/* dist/"
+    "build": "rollup -c",
+    "watch": "rollup -c -w",
+    "lint": "eslint 'src/**/*.{js,ts}'"
   },
   "repository": {
     "type": "git",
@@ -27,17 +27,15 @@
   },
   "homepage": "https://github.com/joopringelberg/perspectives-proxy#readme",
   "devDependencies": {
-    "@babel/cli": "^7.25.7",
-    "@babel/core": "^7.25.8",
-    "@babel/plugin-syntax-dynamic-import": "^7.8.3",
-    "@babel/preset-env": "^7.25.8",
-    "babel-loader": "^9.2.1",
-    "clean-webpack-plugin": "^4.0.0",
-    "copy-webpack-plugin": "^12.0.2",
-    "eslint": "^9.12.0",
+    "@rollup/plugin-commonjs": "^28.0.2",
+    "@rollup/plugin-node-resolve": "^16.0.0",
+    "@rollup/plugin-typescript": "^12.1.2",
+    "@typescript-eslint/eslint-plugin": "^8.25.0",
+    "@typescript-eslint/parser": "^8.25.0",
+    "eslint": "^9.21.0",
     "eslint-plugin-react": "^7.37.1",
-    "webpack": "^5.95.0",
-    "webpack-cli": "^5.1.4",
-    "worker-loader": "^3.0.8"
+    "rollup": "^4.34.8",
+    "tslib": "^2.8.1",
+    "typescript": "^5.7.3"
   }
 }
