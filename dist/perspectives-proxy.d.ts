@@ -1,3 +1,5 @@
+import { Perspective, ScreenDefinition, TableFormDef } from "./perspectivesshape";
+export { Perspective, ScreenDefinition, TableFormDef };
 export declare const PDRproxy: Promise<PerspectivesProxy>;
 type Options = {
     pageHostingPDRPort: (pdr: any) => MessagePort;
@@ -75,91 +77,114 @@ declare class SharedWorkerChannel {
     nextRequestId(): Promise<number>;
     send(req: RequestRecord): Promise<Unsubscriber>;
 }
-type Unsubscriber = {
+export type Unsubscriber = {
     subject: string;
-    corrId: string;
+    corrId: number;
 };
 export declare const SharedWorkerChannelPromise: Promise<SharedWorkerChannel>;
-declare class PerspectivesProxy {
+export declare class PerspectivesProxy {
     channel: SharedWorkerChannel;
     cursor: Cursor;
     constructor(channel: SharedWorkerChannel);
     close(): void;
-    send(req: RequestRecord, receiveValues: valueReceiver, errorHandler: errorHandler): Promise<Unsubscriber>;
+    send(req: RequestRecord, receiveValues: valueReceiver, errorHandler?: errorHandler): Promise<Unsubscriber>;
     unsubscribe(req: RequestRecord): void;
-    getRol(contextID: ContextID, rolName: RolName, receiveValues: valueReceiver, fireAndForget: SubscriptionType, errorHandler: errorHandler): Promise<Unsubscriber>;
-    getUnqualifiedRol(contextID: ContextID, localRolName: RolName, receiveValues: valueReceiver, fireAndForget: SubscriptionType, errorHandler: errorHandler): Promise<Unsubscriber>;
-    getProperty(rolID: RoleInstance, propertyName: PropertyType, roleType: RoleType, receiveValues: valueReceiver, fireAndForget: SubscriptionType, errorHandler: errorHandler): Promise<Unsubscriber>;
-    getPropertyFromLocalName(rolID: RoleInstance, propertyName: PropertyType, roleType: RoleType, receiveValues: valueReceiver, fireAndForget: SubscriptionType, errorHandler: errorHandler): Promise<Unsubscriber>;
-    getBinding(rolID: RoleInstance, receiveValues: valueReceiver, fireAndForget: SubscriptionType, errorHandler: errorHandler): Promise<Unsubscriber>;
-    getRoleBinders(rolID: RoleInstance, contextType: ContextType, roleType: RoleType, receiveValues: valueReceiver, fireAndForget: SubscriptionType, errorHandler: errorHandler): Promise<Unsubscriber>;
-    getMeForContext(externalRoleInstance: RoleInstance, receiveValues: valueReceiver, fireAndForget: SubscriptionType, errorHandler: errorHandler): Promise<Unsubscriber>;
-    getPerspectives(contextInstance: ContextInstance, userRoleType: UserRoleType, receiveValues: valueReceiver, fireAndForget: SubscriptionType, errorHandler: errorHandler): Promise<Unsubscriber>;
-    getPerspective(roleInstanceOfContext: RoleInstance, perspectiveObjectRoleType: RoleType, receiveValues: valueReceiver, fireAndForget: SubscriptionType, errorHandler: errorHandler): Promise<Unsubscriber>;
-    getScreen(userRoleType: UserRoleType, contextInstance: ContextInstance, contextType: ContextType, receiveValues: valueReceiver, fireAndForget: SubscriptionType, errorHandler: errorHandler): Promise<Unsubscriber>;
-    getTableForm(userRoleType: UserRoleType, contextInstance: ContextInstance, roleType: RoleType, receiveValues: valueReceiver, fireAndForget: SubscriptionType, errorHandler: errorHandler): Promise<Unsubscriber>;
-    getLocalRoleSpecialisation(localAspectName: string, contextInstance: ContextInstance, receiveValues: valueReceiver, fireAndForget: SubscriptionType, errorHandler: errorHandler): Promise<Unsubscriber>;
-    getRoleName(rid: RoleInstance, receiveValues: valueReceiver, fireAndForget: SubscriptionType, errorHandler: errorHandler): void;
-    getBindingType(rolID: RoleInstance, receiveValues: valueReceiver, fireAndForget: SubscriptionType, errorHandler: errorHandler): Promise<Unsubscriber>;
-    matchContextName(name: string, receiveValues: valueReceiver, fireAndForget: SubscriptionType, errorHandler: errorHandler): Promise<Unsubscriber>;
-    getChatParticipants(rolID: RoleInstance, propertyId: PropertyType, receiveValues: valueReceiver, fireAndForget: SubscriptionType, errorHandler: errorHandler): Promise<Unsubscriber>;
-    checkBindingP(roleName: RoleType, rolInstance: RoleInstance): Promise<unknown>;
-    getCouchdbUrl(): Promise<unknown>;
-    getContextActions(myRoleType: UserRoleType, contextInstance: ContextInstance): Promise<unknown>;
-    getAllMyRoleTypes(externalRoleInstance: RoleInstance): Promise<unknown>;
-    getViewProperties(rolType: RoleType, viewName: string): Promise<unknown>;
-    getContextType(contextID: ContextID): Promise<unknown>;
-    getRolContext(rolID: RoleInstance): Promise<unknown>;
-    getRolType(rolID: RoleInstance): Promise<unknown>;
-    getRoleKind(rolID: RoleInstance): Promise<unknown>;
-    getUnqualifiedRolType(contextType: ContextType, localRolName: string): Promise<unknown>;
-    getFile(roleInstance: RoleInstance, propertyName: PropertyType): Promise<unknown>;
-    getPublicUrl(contextInstance: ContextInstance): Promise<unknown>;
-    getSystemIdentifier(): Promise<unknown>;
-    getPerspectivesUser(): Promise<unknown>;
-    getMeInContext(roleInstance: RoleInstance): Promise<unknown>;
-    getFileShareCredentials(): Promise<unknown>;
-    createContext(contextDescription: ContextSerializationRecord, roleType: RoleType, contextIdToAddRoleInstanceTo: ContextInstance, myroletype: UserRoleType): Promise<unknown>;
-    createContext_(contextDescription: ContextSerializationRecord, roleInstance: RoleInstance, myroletype: UserRoleType): Promise<unknown>;
-    importContexts(contextDescription: ContextSerializationRecord): Promise<unknown>;
-    importTransaction(transaction: any): Promise<unknown>;
-    setProperty(rolID: RoleInstance, propertyName: PropertyType, value: Value, myroletype: UserRoleType): Promise<unknown>;
-    addProperty(rolID: RoleInstance, propertyName: PropertyType, value: Value, myroletype: UserRoleType): Promise<unknown>;
-    saveFile(perspectivesFile: PerspectivesFile, file: File, myroletype: UserRoleType): Promise<unknown>;
-    deleteProperty(rolID: RoleInstance, propertyName: PropertyType, myroletype: UserRoleType): Promise<unknown>;
-    action(objectRoleInstance: RoleInstance, contextInstance: ContextID, perspectiveId: string, actionName: string, authoringRole: string): Promise<unknown>;
-    contextAction(contextid: ContextInstance, myRoleType: UserRoleType, actionName: string): Promise<unknown>;
-    removeBinding(rolID: RoleInstance, myroletype: UserRoleType): Promise<unknown>;
-    removeRol(rolName: RolName, rolID: RoleInstance, myroletype: UserRoleType): Promise<unknown>;
-    removeContext(rolID: RoleInstance, rolName: RolName, myroletype: UserRoleType): Promise<unknown>;
-    deleteRole(contextID: ContextID, rolName: RolName, myroletype: UserRoleType): Promise<unknown>;
-    bind(contextinstance: ContextInstance, localRolName: RolName, contextType: ContextType, rolDescription: RolSerialization, myroletype: UserRoleType): Promise<unknown>;
-    bind_(filledRole: RoleInstance, filler: RoleInstance, myroletype: UserRoleType): Promise<unknown>;
-    createRole(contextinstance: ContextInstance, rolType: RoleType, myroletype: UserRoleType): Promise<unknown>;
-    setPreferredUserRoleType(externalRoleId: ExternalRoleType, userRoleName: UserRoleType): Promise<unknown>;
-    save(): Promise<unknown>;
-    evaluateRoleState(rolinstance: RoleInstance): Promise<unknown>;
+    getRol(contextID: ContextID, rolName: RolName, receiveValues: RoleReceiver, fireAndForget?: SubscriptionType, errorHandler?: errorHandler): Promise<Unsubscriber>;
+    getUnqualifiedRol(contextID: ContextID, localRolName: RolName, receiveValues: RoleReceiver, fireAndForget?: SubscriptionType, errorHandler?: errorHandler): Promise<Unsubscriber>;
+    getProperty(rolID: RoleInstanceT, propertyName: PropertyType, roleType: RoleType, receiveValues: PropertyValueReceiver, fireAndForget?: SubscriptionType, errorHandler?: errorHandler): Promise<Unsubscriber>;
+    getPropertyFromLocalName(rolID: RoleInstanceT, propertyName: PropertyType, roleType: RoleType, receiveValues: PropertyValueReceiver, fireAndForget?: SubscriptionType, errorHandler?: errorHandler): Promise<Unsubscriber>;
+    getBinding(rolID: RoleInstanceT, receiveValues: RoleReceiver, fireAndForget?: SubscriptionType, errorHandler?: errorHandler): Promise<Unsubscriber>;
+    getRoleBinders(rolID: RoleInstanceT, contextType: ContextType, roleType: RoleType, receiveValues: RoleReceiver, fireAndForget?: SubscriptionType, errorHandler?: errorHandler): Promise<Unsubscriber>;
+    getMeForContext(externalRoleInstance: RoleInstanceT, receiveValues: RoleTypeReceiver, fireAndForget?: SubscriptionType, errorHandler?: errorHandler): Promise<Unsubscriber>;
+    getPerspectives(contextInstance: ContextInstanceT, userRoleType: UserRoleType, receiveValues: PerspectivesReceiver, fireAndForget?: SubscriptionType, errorHandler?: errorHandler): Promise<Unsubscriber>;
+    getPerspective(roleInstanceOfContext: RoleInstanceT, perspectiveObjectRoleType: RoleType | undefined, receiveValues: PerspectivesReceiver, fireAndForget?: SubscriptionType, errorHandler?: errorHandler): Promise<Unsubscriber>;
+    getScreen(userRoleType: UserRoleType, contextInstance: ContextInstanceT, contextType: ContextType, receiveValues: ScreenReceiver, fireAndForget?: SubscriptionType, errorHandler?: errorHandler): Promise<Unsubscriber>;
+    getTableForm(userRoleType: UserRoleType, contextInstance: ContextInstanceT, roleType: RoleType, receiveValues: TableFormReceiver, fireAndForget?: SubscriptionType, errorHandler?: errorHandler): Promise<Unsubscriber>;
+    getLocalRoleSpecialisation(localAspectName: string, contextInstance: ContextInstanceT, receiveValues: RoleTypeReceiver, fireAndForget?: SubscriptionType, errorHandler?: errorHandler): Promise<Unsubscriber>;
+    getRoleName(rid: RoleInstanceT, receiveValues: valueReceiver, fireAndForget?: SubscriptionType, errorHandler?: errorHandler): void;
+    getBindingType(rolID: RoleInstanceT, receiveValues: RoleTypeReceiver, fireAndForget?: SubscriptionType, errorHandler?: errorHandler): Promise<Unsubscriber>;
+    matchContextName(name: string, receiveValues: valueReceiver, fireAndForget?: SubscriptionType, errorHandler?: errorHandler): Promise<Unsubscriber>;
+    getChatParticipants(rolID: RoleInstanceT, propertyId: PropertyType, receiveValues: ((participants: ChatParticipantFields[]) => void), fireAndForget?: SubscriptionType, errorHandler?: errorHandler): Promise<Unsubscriber>;
+    checkBindingP(roleName: RoleType, rolInstance: RoleInstanceT): Promise<boolean>;
+    getCouchdbUrl(): Promise<string>;
+    getContextActions(myRoleType: UserRoleType, contextInstance: ContextInstanceT): Promise<ContextActions>;
+    getAllMyRoleTypes(externalRoleInstance: RoleInstanceT): Promise<RoleType[]>;
+    getViewProperties(rolType: RoleType, viewName: string): Promise<PropertyType[]>;
+    getContextType(contextID: ContextID): Promise<ContextType>;
+    getRolContext(rolID: RoleInstanceT): Promise<ContextInstanceT>;
+    getRolType(rolID: RoleInstanceT): Promise<RoleType>;
+    getRoleKind(rolID: RoleInstanceT): Promise<RoleKind>;
+    getUnqualifiedRolType(contextType: ContextType, localRolName: string): Promise<[RoleType] | []>;
+    getFile(roleInstance: RoleInstanceT, propertyName: PropertyType): Promise<File>;
+    getPublicUrl(contextInstance: ContextInstanceT): Promise<[string] | []>;
+    getSystemIdentifier(): Promise<ContextInstanceT>;
+    getPerspectivesUser(): Promise<RoleInstanceT>;
+    getMeInContext(roleInstance: RoleInstanceT): Promise<[RoleInstanceT] | []>;
+    getFileShareCredentials(): Promise<FileShareCredentials>;
+    createContext(contextDescription: ContextSerializationRecord, roleType: RoleType, contextIdToAddRoleInstanceTo: ContextInstanceT, myroletype: UserRoleType): Promise<[RoleInstanceT, RoleInstanceT] | [RoleInstanceT]>;
+    createContext_(contextDescription: ContextSerializationRecord, roleInstance: RoleInstanceT, myroletype: UserRoleType): Promise<ContextInstanceT>;
+    importContexts(contextDescription: ContextSerializationRecord): Promise<ContextInstanceT[]>;
+    importTransaction(transaction: any): Promise<[]>;
+    setProperty(rolID: RoleInstanceT, propertyName: PropertyType, value: ValueT, myroletype: UserRoleType): Promise<[]>;
+    addProperty(rolID: RoleInstanceT, propertyName: PropertyType, value: ValueT, myroletype: UserRoleType): Promise<[]>;
+    saveFile(perspectivesFile: PerspectivesFile, file: File, myroletype: UserRoleType): Promise<PerspectivesFile>;
+    deleteProperty(rolID: RoleInstanceT, propertyName: PropertyType, myroletype: UserRoleType): Promise<[]>;
+    action(objectRoleInstance: RoleInstanceT, contextInstance: ContextID, perspectiveId: string, actionName: string, authoringRole: string): Promise<[]>;
+    contextAction(contextid: ContextInstanceT, myRoleType: UserRoleType, actionName: string): Promise<[]>;
+    removeBinding(rolID: RoleInstanceT, myroletype: UserRoleType): Promise<[]>;
+    removeRol(rolName: RolName, rolID: RoleInstanceT, myroletype: UserRoleType): Promise<[]>;
+    removeContext(rolID: RoleInstanceT, rolName: RolName, myroletype: UserRoleType): Promise<[]>;
+    deleteRole(contextID: ContextID, rolName: RolName, myroletype: UserRoleType): Promise<[]>;
+    bind(contextinstance: ContextInstanceT, localRolName: RolName, contextType: ContextType, rolDescription: RolSerialization, myroletype: UserRoleType): Promise<RoleInstanceT>;
+    bind_(filledRole: RoleInstanceT, filler: RoleInstanceT, myroletype: UserRoleType): Promise<[]>;
+    createRole(contextinstance: ContextInstanceT, rolType: RoleType, myroletype: UserRoleType): Promise<RoleInstanceT>;
+    setPreferredUserRoleType(externalRoleId: ExternalRoleType, userRoleName: UserRoleType): Promise<[]>;
+    save(): Promise<[]>;
+    evaluateRoleState(rolinstance: RoleInstanceT): Promise<[]>;
 }
 export declare const FIREANDFORGET = true;
 export declare const CONTINUOUS = false;
+export type RoleInstanceT = string & {
+    readonly brand: unique symbol;
+};
+export type RoleReceiver = (roleInstance: RoleInstanceT[]) => void;
+export type ContextInstanceT = string & {
+    readonly brand: unique symbol;
+};
+export type ValueT = string & {
+    readonly brand: unique symbol;
+};
+export type PropertyValueReceiver = (value: ValueT[]) => void;
+export type RoleType = string & {
+    readonly brand: unique symbol;
+};
+type UserRoleType = RoleType;
+export type RoleTypeReceiver = (roleType: RoleType[]) => void;
+export type PerspectivesReceiver = (perspectives: Perspective[]) => void;
+export type ScreenReceiver = (screen: ScreenDefinition[]) => void;
+export type TableFormReceiver = (tableForm: TableFormDef[]) => void;
+export type PropertyType = string & {
+    readonly brand: unique symbol;
+};
+export type ContextType = string & {
+    readonly brand: unique symbol;
+};
+export type RoleKind = "RoleInContext" | "ContextRole" | "ExternalRole" | "UserRole" | "BotRole";
+export type EnumeratedOrCalculatedProperty = {
+    type: "ENP" | "CP";
+    value: PropertyType;
+};
 type SubscriptionType = boolean;
 type valueReceiver = (value: any) => void;
 type errorHandler = (error: string) => void;
 type ContextID = string;
 type RolName = string;
-type ContextType = string;
-type RoleType = string;
-type RoleInstance = string;
-type ContextInstance = string;
-type UserRoleType = string;
 type ExternalRoleType = string;
-type PropertyType = string;
-type Value = string;
 type ContextSerializationRecord = {
     id?: string;
     prototype?: ContextID;
     ctype: ContextType;
-    rollen: Record<RoleInstance, RolSerialization>;
+    rollen: Record<RoleInstanceT, RolSerialization>;
     externeProperties: PropertySerialization;
 };
 type RolSerialization = {
@@ -168,17 +193,32 @@ type RolSerialization = {
     binding?: string;
 };
 type PropertySerialization = {
-    [key: string]: Value[];
+    [key: string]: ValueT[];
 };
 export type PerspectivesFile = {
     fileName: string;
-    propertyType: string;
+    propertyType: PropertyType;
     mimeType: string;
     database?: string;
     roleFileName: string;
 };
+type ChatParticipantFields = {
+    roleInstance: RoleInstanceT;
+    firstname?: ValueT;
+    lastname?: ValueT;
+    avatar?: string;
+};
+type ModeledActionName = string;
+type TranslatedActionName = string;
+export type ContextActions = Record<ModeledActionName, TranslatedActionName>;
+export type FileShareCredentials = {
+    accountName: string;
+    password: string;
+    storageType: StorageType;
+    sharedStorageId: RoleInstanceT;
+};
+export type StorageType = "mega" | "ppstorage";
 declare class Cursor {
     wait(): void;
     restore(): void;
 }
-export {};

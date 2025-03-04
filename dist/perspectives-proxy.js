@@ -367,26 +367,26 @@ class PerspectivesProxy {
     //// immediately.
     ///////////////////////////////////////////////////////////////////////////////////////
     // rolName must be qualified but may use default prefixes.
-    getRol(contextID, rolName, receiveValues, fireAndForget, errorHandler) {
-        return this.send({ request: "GetRol", subject: contextID, predicate: rolName, onlyOnce: !!fireAndForget }, receiveValues, errorHandler);
+    getRol(contextID, rolName, receiveValues, fireAndForget = false, errorHandler) {
+        return this.send({ request: "GetRol", subject: contextID, predicate: rolName, onlyOnce: fireAndForget }, receiveValues, errorHandler);
     }
-    getUnqualifiedRol(contextID, localRolName, receiveValues, fireAndForget, errorHandler) {
-        return this.send({ request: "GetUnqualifiedRol", subject: contextID, predicate: localRolName, onlyOnce: !!fireAndForget }, receiveValues, errorHandler);
+    getUnqualifiedRol(contextID, localRolName, receiveValues, fireAndForget = false, errorHandler) {
+        return this.send({ request: "GetUnqualifiedRol", subject: contextID, predicate: localRolName, onlyOnce: fireAndForget }, receiveValues, errorHandler);
     }
-    getProperty(rolID, propertyName, roleType, receiveValues, fireAndForget, errorHandler) {
-        return this.send({ request: "GetProperty", subject: rolID, predicate: propertyName, object: roleType, onlyOnce: !!fireAndForget }, receiveValues, errorHandler);
+    getProperty(rolID, propertyName, roleType, receiveValues, fireAndForget = false, errorHandler) {
+        return this.send({ request: "GetProperty", subject: rolID, predicate: propertyName, object: roleType, onlyOnce: fireAndForget }, receiveValues, errorHandler);
     }
-    getPropertyFromLocalName(rolID, propertyName, roleType, receiveValues, fireAndForget, errorHandler) {
-        return this.send({ request: "GetPropertyFromLocalName", subject: rolID, predicate: propertyName, object: roleType, onlyOnce: !!fireAndForget }, receiveValues, errorHandler);
+    getPropertyFromLocalName(rolID, propertyName, roleType, receiveValues, fireAndForget = false, errorHandler) {
+        return this.send({ request: "GetPropertyFromLocalName", subject: rolID, predicate: propertyName, object: roleType, onlyOnce: fireAndForget }, receiveValues, errorHandler);
     }
-    getBinding(rolID, receiveValues, fireAndForget, errorHandler) {
-        return this.send({ request: "GetBinding", subject: rolID, predicate: "", onlyOnce: !!fireAndForget }, receiveValues, errorHandler);
+    getBinding(rolID, receiveValues, fireAndForget = false, errorHandler) {
+        return this.send({ request: "GetBinding", subject: rolID, predicate: "", onlyOnce: fireAndForget }, receiveValues, errorHandler);
     }
     // Note: this function is currently not in use.
     // The lexical context of the roleType can be used by providing the empty string
     // as argument for parameter contextType.
-    getRoleBinders(rolID, contextType, roleType, receiveValues, fireAndForget, errorHandler) {
-        return this.send({ request: "GetRoleBinders", subject: rolID, predicate: roleType, object: contextType, onlyOnce: !!fireAndForget }, receiveValues, errorHandler);
+    getRoleBinders(rolID, contextType, roleType, receiveValues, fireAndForget = false, errorHandler) {
+        return this.send({ request: "GetRoleBinders", subject: rolID, predicate: roleType, object: contextType, onlyOnce: fireAndForget }, receiveValues, errorHandler);
     }
     // getUnqualifiedRoleBinders (rolID : RoleInstance, localRolName, receiveValues)
     // {
@@ -395,74 +395,75 @@ class PerspectivesProxy {
     //     receiveValues);
     // }
     // Returns an array of Role Types.
-    getMeForContext(externalRoleInstance, receiveValues, fireAndForget, errorHandler) {
-        return this.send({ request: "GetMeForContext", subject: externalRoleInstance, onlyOnce: !!fireAndForget }, receiveValues, errorHandler);
+    getMeForContext(externalRoleInstance, receiveValues, fireAndForget = false, errorHandler) {
+        return this.send({ request: "GetMeForContext", subject: externalRoleInstance, onlyOnce: fireAndForget }, receiveValues, errorHandler);
     }
-    getPerspectives(contextInstance, userRoleType, receiveValues, fireAndForget, errorHandler) {
+    getPerspectives(contextInstance, userRoleType, receiveValues, fireAndForget = false, errorHandler) {
         return this.send({ request: "GetPerspectives",
             subject: userRoleType,
             object: contextInstance,
-            onlyOnce: !!fireAndForget
+            onlyOnce: fireAndForget
         }, function (perspectiveStrings) {
             return receiveValues(perspectiveStrings.map(JSON.parse));
         }, errorHandler);
     }
     // { request: "GetPerspective", subject: PerspectiveObjectRoleType OPTIONAL, predicate: RoleInstanceOfContext }
-    getPerspective(roleInstanceOfContext, perspectiveObjectRoleType /*OPTIONAL*/, receiveValues, fireAndForget, errorHandler) {
+    // No explicit type given for perspectiveObjectRoleType; assume that roleInstanceOfContext has the instance of the role that we want a perspective on.
+    getPerspective(roleInstanceOfContext, perspectiveObjectRoleType = "", receiveValues, fireAndForget = false, errorHandler) {
         return this.send({ request: "GetPerspective",
             subject: perspectiveObjectRoleType,
             predicate: roleInstanceOfContext,
-            onlyOnce: !!fireAndForget
+            onlyOnce: fireAndForget
         }, function (perspectiveStrings) {
             return receiveValues(perspectiveStrings.map(JSON.parse));
         }, errorHandler);
     }
     // { request: "GetScreen", subject: UserRoleType, predicate: ContextType, object: ContextInstance }
-    getScreen(userRoleType, contextInstance, contextType, receiveValues, fireAndForget, errorHandler) {
+    getScreen(userRoleType, contextInstance, contextType, receiveValues, fireAndForget = false, errorHandler) {
         return this.send({ request: "GetScreen",
             subject: userRoleType,
             predicate: contextType,
             object: contextInstance,
-            onlyOnce: !!fireAndForget
+            onlyOnce: fireAndForget
         }, function (screenStrings) {
             return receiveValues(screenStrings.map(JSON.parse));
         }, errorHandler);
     }
     // { request: "GetTableForm", subject: UserRoleType, predicate: ContextInstance, object: RoleType }
-    getTableForm(userRoleType, contextInstance, roleType, receiveValues, fireAndForget, errorHandler) {
+    getTableForm(userRoleType, contextInstance, roleType, receiveValues, fireAndForget = false, errorHandler) {
         return this.send({ request: "GetTableForm",
             subject: userRoleType,
             predicate: contextInstance,
             object: roleType,
-            onlyOnce: !!fireAndForget
+            onlyOnce: fireAndForget
         }, function (tableValueStrings) {
             return receiveValues(tableValueStrings.map(JSON.parse));
         }, errorHandler);
     }
-    getLocalRoleSpecialisation(localAspectName, contextInstance, receiveValues, fireAndForget, errorHandler) {
+    getLocalRoleSpecialisation(localAspectName, contextInstance, receiveValues, fireAndForget = false, errorHandler) {
         return this.send({ request: "GetLocalRoleSpecialisation",
             subject: contextInstance,
             predicate: localAspectName,
-            onlyOnce: !!fireAndForget }, receiveValues, errorHandler);
+            onlyOnce: fireAndForget }, receiveValues, errorHandler);
     }
-    getRoleName(rid, receiveValues, fireAndForget, errorHandler) {
+    getRoleName(rid, receiveValues, fireAndForget = false, errorHandler) {
         this.send({ request: "GetRoleName",
             object: rid,
-            onlyOnce: !!fireAndForget
+            onlyOnce: fireAndForget
         }, receiveValues, errorHandler);
     }
     // We haven't made this promisebased because the binding can change, even though its type cannot.
-    getBindingType(rolID, receiveValues, fireAndForget, errorHandler) {
-        return this.send({ request: "GetBindingType", subject: rolID, predicate: "", onlyOnce: !!fireAndForget }, receiveValues, errorHandler);
+    getBindingType(rolID, receiveValues, fireAndForget = false, errorHandler) {
+        return this.send({ request: "GetBindingType", subject: rolID, predicate: "", onlyOnce: fireAndForget }, receiveValues, errorHandler);
     }
-    matchContextName(name, receiveValues, fireAndForget, errorHandler) {
-        return this.send({ request: "MatchContextName", subject: name, onlyOnce: !!fireAndForget }, receiveValues, errorHandler);
+    matchContextName(name, receiveValues, fireAndForget = false, errorHandler) {
+        return this.send({ request: "MatchContextName", subject: name, onlyOnce: fireAndForget }, receiveValues, errorHandler);
     }
     // Returns {roleInstance, firstname, lastname, avatar [OPTIONAL]}
     // rolID is the role that has the Chat properties; 
     // propertyId is one of the Chat properties (messages or media) (by construction it must be Enumerated)
-    getChatParticipants(rolID, propertyId, receiveValues, fireAndForget, errorHandler) {
-        return this.send({ request: "GetChatParticipants", subject: rolID, predicate: propertyId, onlyOnce: !!fireAndForget }, (serialisedParticipants) => receiveValues(serialisedParticipants.map(JSON.parse)), errorHandler);
+    getChatParticipants(rolID, propertyId, receiveValues, fireAndForget = false, errorHandler) {
+        return this.send({ request: "GetChatParticipants", subject: rolID, predicate: propertyId, onlyOnce: fireAndForget }, (serialisedParticipants) => receiveValues(serialisedParticipants.map(JSON.parse)), errorHandler);
     }
     ///////////////////////////////////////////////////////////////////////////////////////
     //// PROMISE RETURNING GETTERS.
@@ -475,7 +476,7 @@ class PerspectivesProxy {
     checkBindingP(roleName, rolInstance) {
         const proxy = this;
         return new Promise(function (resolver, rejecter) {
-            proxy.send({ request: "CheckBinding", predicate: roleName, object: rolInstance, onlyOnce: true }, resolver, rejecter);
+            proxy.send({ request: "CheckBinding", predicate: roleName, object: rolInstance, onlyOnce: true }, (r => resolver(r[0])), rejecter);
         });
     }
     // matchContextName( name )
@@ -496,9 +497,7 @@ class PerspectivesProxy {
     getCouchdbUrl() {
         const proxy = this;
         return new Promise(function (resolver, rejecter) {
-            proxy.send({ request: "GetCouchdbUrl", onlyOnce: true }, function (url) {
-                resolver(url);
-            }, function (e) { rejecter(e); });
+            proxy.send({ request: "GetCouchdbUrl", onlyOnce: true }, (r => resolver(r[0])), function (e) { rejecter(e); });
         });
     }
     // { request: GetContextActions
@@ -536,26 +535,26 @@ class PerspectivesProxy {
     getContextType(contextID) {
         const proxy = this;
         return new Promise(function (resolver, rejecter) {
-            return proxy.send({ request: "GetContextType", subject: contextID, predicate: "", onlyOnce: true }, resolver, rejecter);
+            return proxy.send({ request: "GetContextType", subject: contextID, predicate: "", onlyOnce: true }, (r => resolver(r[0])), rejecter);
         });
     }
     getRolContext(rolID) {
         const proxy = this;
         return new Promise(function (resolver, rejecter) {
-            return proxy.send({ request: "GetRolContext", subject: rolID, predicate: "", onlyOnce: true }, resolver, rejecter);
+            return proxy.send({ request: "GetRolContext", subject: rolID, predicate: "", onlyOnce: true }, (r => resolver(r[0])), rejecter);
         });
     }
     getRolType(rolID) {
         const proxy = this;
         return new Promise(function (resolver, rejecter) {
-            return proxy.send({ request: "GetRolType", subject: rolID, predicate: "", onlyOnce: true }, resolver, rejecter);
+            return proxy.send({ request: "GetRolType", subject: rolID, predicate: "", onlyOnce: true }, (r => resolver(r[0])), rejecter);
         });
     }
     // RoleInContext | ContextRole | ExternalRole | UserRole | BotRole
     getRoleKind(rolID) {
         const proxy = this;
         return new Promise(function (resolver, rejecter) {
-            return proxy.send({ request: "GetRoleKind", subject: rolID, predicate: "", onlyOnce: true }, resolver, rejecter);
+            return proxy.send({ request: "GetRoleKind", subject: rolID, predicate: "", onlyOnce: true }, (r => resolver(r[0])), rejecter);
         });
     }
     getUnqualifiedRolType(contextType, localRolName) {
@@ -567,7 +566,7 @@ class PerspectivesProxy {
     getFile(roleInstance, propertyName) {
         const proxy = this;
         return new Promise(function (resolver, rejecter) {
-            return proxy.send({ request: "GetFile", subject: roleInstance, predicate: propertyName, onlyOnce: true }, resolver, rejecter);
+            return proxy.send({ request: "GetFile", subject: roleInstance, predicate: propertyName, onlyOnce: true }, (r => resolver(r[0])), rejecter);
         });
     }
     // Returns a promise for the pubic address of the context - if any.
@@ -581,14 +580,14 @@ class PerspectivesProxy {
     getSystemIdentifier() {
         const proxy = this;
         return new Promise(function (resolver, rejecter) {
-            return proxy.send({ request: "GetSystemIdentifier", onlyOnce: true }, resolver, rejecter);
+            return proxy.send({ request: "GetSystemIdentifier", onlyOnce: true }, (r => resolver(r[0])), rejecter);
         });
     }
     // The instance of model:System$TheWorld$PerspectivesUsers that represents the natural person owning this installation in the Perspectives Universe.
     getPerspectivesUser() {
         const proxy = this;
         return new Promise(function (resolver, rejecter) {
-            return proxy.send({ request: "GetPerspectivesUser", onlyOnce: true }, resolver, rejecter);
+            return proxy.send({ request: "GetPerspectivesUser", onlyOnce: true }, (r => resolver(r[0])), rejecter);
         });
     }
     // The user role instance in the context of the given role instance that is ultimately filled by the PerspectivesUsers instance that represents
@@ -627,6 +626,8 @@ class PerspectivesProxy {
     // So:  [<externalRoleId>(, <contextRoleId>)?]
     // object must be the type of the context to disambiguate the roleType name in.
     // subject must be the context instance to add a role instance to.
+    // The first role instance in the array is the external role instance. The second is the context role instance.
+    // NOTE: this function is not used in the current implementation.
     createContext(contextDescription, roleType, contextIdToAddRoleInstanceTo, myroletype) {
         const proxy = this;
         return new Promise(function (resolver, rejecter) {
@@ -639,7 +640,7 @@ class PerspectivesProxy {
     createContext_(contextDescription, roleInstance, myroletype) {
         const proxy = this;
         return new Promise(function (resolver, rejecter) {
-            return proxy.send({ request: "CreateContext_", subject: roleInstance, contextDescription: contextDescription, authoringRole: myroletype, onlyOnce: true }, resolver, rejecter);
+            return proxy.send({ request: "CreateContext_", subject: roleInstance, contextDescription: contextDescription, authoringRole: myroletype, onlyOnce: true }, (r => resolver(r[0])), rejecter);
         });
     }
     // Either throws an error, or returns an array of context identifiers.
@@ -677,7 +678,7 @@ class PerspectivesProxy {
         return file.arrayBuffer().then(function (buf) {
             // Because contextDescription is declared as a Foreign, we put the ArrayBuffer there.
             return new Promise(function (resolver, rejecter) {
-                return proxy.send({ request: "SaveFile", subject: JSON.stringify(perspectivesFile), contextDescription: buf, authoringRole: myroletype, onlyOnce: true }, resolver, rejecter);
+                return proxy.send({ request: "SaveFile", subject: JSON.stringify(perspectivesFile), contextDescription: buf, authoringRole: myroletype, onlyOnce: true }, fileInArray => resolver(fileInArray[0]), rejecter);
             });
         });
     }
@@ -756,7 +757,7 @@ class PerspectivesProxy {
     bind(contextinstance, localRolName, contextType, rolDescription, myroletype) {
         const proxy = this;
         return new Promise(function (resolver, rejecter) {
-            return proxy.send({ request: "Bind", subject: contextinstance, predicate: localRolName, object: contextType, rolDescription: rolDescription, authoringRole: myroletype, onlyOnce: true }, resolver, rejecter);
+            return proxy.send({ request: "Bind", subject: contextinstance, predicate: localRolName, object: contextType, rolDescription: rolDescription, authoringRole: myroletype, onlyOnce: true }, (r => resolver(r[0])), rejecter);
         });
     }
     bind_(filledRole, filler, myroletype) {
@@ -769,7 +770,7 @@ class PerspectivesProxy {
     createRole(contextinstance, rolType, myroletype) {
         const proxy = this;
         return new Promise(function (resolver, rejecter) {
-            return proxy.send({ request: "CreateRol", subject: contextinstance, predicate: rolType, authoringRole: myroletype, onlyOnce: true }, resolver, rejecter);
+            return proxy.send({ request: "CreateRol", subject: contextinstance, predicate: rolType, authoringRole: myroletype, onlyOnce: true }, (r => resolver(r[0])), rejecter);
         });
     }
     setPreferredUserRoleType(externalRoleId, userRoleName) {
@@ -934,5 +935,5 @@ class Cursor {
 // }
 // test2
 
-export { CONTINUOUS, FIREANDFORGET, PDRproxy, SharedWorkerChannelPromise, configurePDRproxy };
+export { CONTINUOUS, FIREANDFORGET, PDRproxy, PerspectivesProxy, SharedWorkerChannelPromise, configurePDRproxy };
 //# sourceMappingURL=perspectives-proxy.js.map
