@@ -805,6 +805,30 @@ class Cursor {
         document.body.style.cursor = "auto";
     }
 }
+// See: https://developer.mozilla.org/en-US/docs/Web/HTML/Element/input
+// We add "markdown"
+function mapRange(range) {
+    switch (range) {
+        case "PString":
+            return "text";
+        case "PBool":
+            return "checkbox";
+        case "PDateTime":
+            return "datetime-local";
+        case "PDate":
+            return "date";
+        case "PTime":
+            return "time";
+        case "PNumber":
+            return "number";
+        case "PEmail":
+            return "email";
+        case "PFile":
+            return "file";
+        case "PMarkDown":
+            return "markdown";
+    }
+}
 ////////////////////////////////////////////////////////////////////////////////
 //// TCP CHANNEL
 ////////////////////////////////////////////////////////////////////////////////
@@ -935,5 +959,5 @@ class Cursor {
 // }
 // test2
 
-export { CONTINUOUS, FIREANDFORGET, PDRproxy, PerspectivesProxy, SharedWorkerChannelPromise, configurePDRproxy };
+export { CONTINUOUS, FIREANDFORGET, PDRproxy, PerspectivesProxy, SharedWorkerChannelPromise, configurePDRproxy, mapRange };
 //# sourceMappingURL=perspectives-proxy.js.map

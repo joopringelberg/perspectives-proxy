@@ -1,4 +1,4 @@
-import type { Perspective, ScreenDefinition, TableFormDef } from "./perspectivesshape.d.ts";
+import type { RoleInstanceT, RoleReceiver, ContextInstanceT, ValueT, PropertyValueReceiver, RoleType, UserRoleType, RoleTypeReceiver, PerspectivesReceiver, ScreenReceiver, TableFormReceiver, PropertyType, ContextType, RoleKind, ContextActions, FileShareCredentials, PSharedFile, PerspectivesFile, RuntimeOptions, PouchdbUser, Unsubscriber, PRange, InputType } from "./perspectivesshape.d.ts";
 export type * from "./perspectivesshape.d.ts";
 export declare const PDRproxy: Promise<PerspectivesProxy>;
 type Options = {
@@ -17,20 +17,6 @@ interface RequestRecord {
     reactStateSetter?: (response: any) => void;
     corrId?: number;
 }
-export type RuntimeOptions = {
-    isFirstInstallation: boolean;
-    useSystemVersion: string | null;
-    privateKey?: CryptoKey;
-    publicKey?: CryptoKey;
-    myContextsVersion: string;
-};
-export type PouchdbUser = {
-    systemIdentifier: string;
-    perspectivesUser: string;
-    userName: string;
-    password?: string;
-    couchdbUrl?: string;
-};
 type Response = ErrorResponse | ResultResponse | WorkerResponse;
 type ErrorResponse = {
     responseType: "APIerror";
@@ -77,10 +63,6 @@ declare class SharedWorkerChannel {
     nextRequestId(): Promise<number>;
     send(req: RequestRecord): Promise<Unsubscriber>;
 }
-export type Unsubscriber = {
-    subject: string;
-    corrId: number;
-};
 export declare const SharedWorkerChannelPromise: Promise<SharedWorkerChannel>;
 export declare class PerspectivesProxy {
     channel: SharedWorkerChannel;
@@ -144,36 +126,6 @@ export declare class PerspectivesProxy {
 }
 export declare const FIREANDFORGET = true;
 export declare const CONTINUOUS = false;
-export type RoleInstanceT = string & {
-    readonly brand: unique symbol;
-};
-export type RoleReceiver = (roleInstance: RoleInstanceT[]) => void;
-export type ContextInstanceT = string & {
-    readonly brand: unique symbol;
-};
-export type ValueT = string & {
-    readonly brand: unique symbol;
-};
-export type PropertyValueReceiver = (value: ValueT[]) => void;
-export type RoleType = string & {
-    readonly brand: unique symbol;
-};
-type UserRoleType = RoleType;
-export type RoleTypeReceiver = (roleType: RoleType[]) => void;
-export type PerspectivesReceiver = (perspectives: Perspective[]) => void;
-export type ScreenReceiver = (screen: ScreenDefinition[]) => void;
-export type TableFormReceiver = (tableForm: TableFormDef[]) => void;
-export type PropertyType = string & {
-    readonly brand: unique symbol;
-};
-export type ContextType = string & {
-    readonly brand: unique symbol;
-};
-export type RoleKind = "RoleInContext" | "ContextRole" | "ExternalRole" | "UserRole" | "BotRole";
-export type EnumeratedOrCalculatedProperty = {
-    type: "ENP" | "CP";
-    value: PropertyType;
-};
 type SubscriptionType = boolean;
 type valueReceiver = (value: any) => void;
 type errorHandler = (error: string) => void;
@@ -195,38 +147,14 @@ type RolSerialization = {
 type PropertySerialization = {
     [key: string]: ValueT[];
 };
-export type PerspectivesFile = {
-    fileName: string;
-    propertyType: PropertyType;
-    mimeType: string;
-    database?: string;
-    roleFileName: string;
-};
 type ChatParticipantFields = {
     roleInstance: RoleInstanceT;
     firstname?: ValueT;
     lastname?: ValueT;
     avatar?: PSharedFile;
 };
-type ModeledActionName = string;
-type TranslatedActionName = string;
-export type ContextActions = Record<ModeledActionName, TranslatedActionName>;
-export type FileShareCredentials = {
-    accountName: string;
-    password: string;
-    storageType: PStorageType;
-    sharedStorageId: RoleInstanceT;
-};
-export type PStorageType = "mega" | "ppstorage";
-export interface PSharedFile {
-    name: string;
-    size: number;
-    type: string;
-    sharedStorageId: string;
-    storageType: string;
-    url: string;
-}
 declare class Cursor {
     wait(): void;
     restore(): void;
 }
+export declare function mapRange(range: PRange): InputType;

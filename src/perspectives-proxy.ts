@@ -18,7 +18,31 @@
 // Full text of this license can be found in the LICENSE file in the projects root.
 // END LICENSE
 
-import type { Perspective, ScreenDefinition, TableFormDef } from "./perspectivesshape.d.ts";
+import type {
+  RoleInstanceT,
+  RoleReceiver,
+  ContextInstanceT,
+  ValueT,
+  PropertyValueReceiver,
+  RoleType,
+  UserRoleType,
+  RoleTypeReceiver,
+  PerspectivesReceiver,
+  ScreenReceiver,
+  TableFormReceiver,
+  PropertyType,
+  ContextType,
+  RoleKind,
+  ContextActions,
+  FileShareCredentials,
+  PSharedFile,
+  PerspectivesFile,
+  RuntimeOptions,
+  PouchdbUser,
+  Unsubscriber,
+  PRange,
+  InputType
+} from "./perspectivesshape.d.ts";
 
 export type * from "./perspectivesshape.d.ts";
 /*
@@ -121,26 +145,6 @@ const defaultRequest =
 /////////////////////////////////////////////////////////////////////////////////////////
 // PDRTYPES
 /////////////////////////////////////////////////////////////////////////////////////////
-export type RuntimeOptions = {
-  // Default: true. Should be false when someone installs MyContexts on a second device.
-  isFirstInstallation: boolean;
-  // Default: null. Provide a value to test setup of an experimental new System version.
-  useSystemVersion: string | null;
-  // Default: the CryptoKey object that has been created on setting up the installation. This is not extractable.
-  privateKey?: CryptoKey;
-  // Default: the CryptoKey object that has been created on setting up the installation. This is extractable.
-  publicKey?: CryptoKey;
-  // Default: the package number taken from package.json
-  myContextsVersion: string;
-};
-
-export type PouchdbUser = {
-  systemIdentifier: string;  // the schemaless string
-  perspectivesUser: string;  // the schemaless string
-  userName: string;          // this MAY be equal to perspectivesUser but it is not required.
-  password?: string;         // Optional field
-  couchdbUrl?: string;       // Optional field
-};
 
 type Response = ErrorResponse | ResultResponse | WorkerResponse;
 
@@ -478,8 +482,6 @@ class SharedWorkerChannel
   }
 
 }
-
-export type Unsubscriber = { subject: string; corrId: number };
 
 let sharedWorkerChannelResolver: (value: SharedWorkerChannel | PromiseLike<SharedWorkerChannel>) => void/*, sharedWorkerChannelRejecter*/;
 
@@ -1345,22 +1347,6 @@ export class PerspectivesProxy
 export const FIREANDFORGET = true;
 export const CONTINUOUS = false;
 
-// NOTE: RoleInstanceT is the typescript type of role instances. Don't confuse it with RoleType, which is the typescript type of role types.
-export type RoleInstanceT = string & { readonly brand: unique symbol };
-export type RoleReceiver = (roleInstance: RoleInstanceT[]) => void;
-export type ContextInstanceT = string & { readonly brand: unique symbol };
-export type ValueT = string & { readonly brand: unique symbol };
-export type PropertyValueReceiver = (value: ValueT[]) => void;
-export type RoleType = string & { readonly brand: unique symbol };
-type UserRoleType = RoleType
-export type RoleTypeReceiver = (roleType: RoleType[]) => void;
-export type PerspectivesReceiver = (perspectives: Perspective[]) => void;
-export type ScreenReceiver = (screen: ScreenDefinition[]) => void;
-export type TableFormReceiver = (tableForm: TableFormDef[]) => void;
-export type PropertyType = string & { readonly brand: unique symbol };
-export type ContextType = string & { readonly brand: unique symbol };
-export type RoleKind = "RoleInContext" | "ContextRole" | "ExternalRole" | "UserRole" | "BotRole"
-export type EnumeratedOrCalculatedProperty = {type: "ENP" | "CP", value: PropertyType}
 
 type SubscriptionType = boolean
 type valueReceiver = (value: any) => void;
@@ -1386,39 +1372,11 @@ type RolSerialization =
 
 type PropertySerialization = { [key: string]: ValueT[] }
 
-export type PerspectivesFile = {
-  // The name associated with the file on creating or uploading it. Use only client side.
-  fileName: string;
-  // The identifier of the attachment of the role instance.
-  propertyType: PropertyType;
-  mimeType: string;
-  // The database where the role instance is stored. (is Nothing for IndexedDB)
-  database?: string;
-  // The name of the role instance document
-  roleFileName: string;
-};
-
 type ChatParticipantFields = {roleInstance : RoleInstanceT, firstname? : ValueT, lastname? : ValueT, avatar? : PSharedFile} // avatar will be a PSharedFile.
 
 type ModeledActionName = string
 type TranslatedActionName = string
-export type ContextActions = Record<ModeledActionName, TranslatedActionName>;
 
-export type FileShareCredentials = { accountName : string, password : string, storageType: PStorageType, sharedStorageId : RoleInstanceT };
-
-export type PStorageType = "mega" | "ppstorage";
-
-////////////////////////////////////////////
-//// PSHAREDFILE
-////////////////////////////////////////////
-export interface PSharedFile {
-  name: string;
-  size: number;
-  type: string;
-  sharedStorageId: string;
-  storageType: string;
-  url: string;
-}
 
 ////////////////////////////////////////////////////////////////////////////////
 //// CURSOR HANDLING
@@ -1432,6 +1390,32 @@ class Cursor
   restore()
   {
     document.body.style.cursor = "auto";
+  }
+}
+
+// See: https://developer.mozilla.org/en-US/docs/Web/HTML/Element/input
+// We add "markdown"
+export function mapRange( range : PRange ) : InputType
+{
+  switch (range) {
+    case "PString":
+      return "text";
+    case "PBool":
+      return "checkbox";
+    case "PDateTime":
+      return "datetime-local";
+    case "PDate":
+      return "date";
+    case "PTime":
+      return "time";
+      case "PNumber":
+      return "number";
+    case "PEmail":
+      return "email";
+    case "PFile":
+      return "file";
+    case "PMarkDown":
+      return "markdown"
   }
 }
 
