@@ -18,10 +18,9 @@
 // Full text of this license can be found in the LICENSE file in the projects root.
 // END LICENSE
 
-import { Perspective, ScreenDefinition, TableFormDef } from "./perspectivesshape";
+import type { Perspective, ScreenDefinition, TableFormDef } from "./perspectivesshape.d.ts";
 
-export { Perspective, ScreenDefinition, TableFormDef }
-
+export type * from "./perspectivesshape.d.ts";
 /*
 This module is imported both by the core and by clients and bridges the gap between the two. It supports several architectures:
   1 with core and client in the same javascript process;
@@ -66,7 +65,7 @@ export const PDRproxy: Promise<PerspectivesProxy> = new Promise(
 // type Port = Int
 // type Host = String
 
-type Options = { pageHostingPDRPort: (pdr: any) => MessagePort };
+type Options = { pageHostingPDRPort?: (pdr: any) => MessagePort };
 
 export function configurePDRproxy(channeltype: "internalChannel" | "sharedWorkerChannel" | "hostPageChannel", options: Options): void 
 {
@@ -83,7 +82,7 @@ export function configurePDRproxy(channeltype: "internalChannel" | "sharedWorker
     case "hostPageChannel":
         import( "perspectives-core" ).then( pdr => {
         // pageHostingPDRPort returns a MessageChannel as documented here: https://developer.mozilla.org/en-US/docs/Web/API/MessagePort.
-        sharedWorkerChannel = new SharedWorkerChannel( options.pageHostingPDRPort( pdr ) );
+        sharedWorkerChannel = new SharedWorkerChannel( options.pageHostingPDRPort!( pdr ) );
         sharedWorkerChannelResolver( sharedWorkerChannel );
         pdrProxyResolver( new PerspectivesProxy( sharedWorkerChannel ) );
         });
@@ -122,7 +121,7 @@ const defaultRequest =
 /////////////////////////////////////////////////////////////////////////////////////////
 // PDRTYPES
 /////////////////////////////////////////////////////////////////////////////////////////
-type RuntimeOptions = {
+export type RuntimeOptions = {
   // Default: true. Should be false when someone installs MyContexts on a second device.
   isFirstInstallation: boolean;
   // Default: null. Provide a value to test setup of an experimental new System version.
@@ -135,7 +134,7 @@ type RuntimeOptions = {
   myContextsVersion: string;
 };
 
-type PouchdbUser = {
+export type PouchdbUser = {
   systemIdentifier: string;  // the schemaless string
   perspectivesUser: string;  // the schemaless string
   userName: string;          // this MAY be equal to perspectivesUser but it is not required.
@@ -1399,15 +1398,27 @@ export type PerspectivesFile = {
   roleFileName: string;
 };
 
-type ChatParticipantFields = {roleInstance : RoleInstanceT, firstname? : ValueT, lastname? : ValueT, avatar? : string} // avatar will be a PSharedFile.
+type ChatParticipantFields = {roleInstance : RoleInstanceT, firstname? : ValueT, lastname? : ValueT, avatar? : PSharedFile} // avatar will be a PSharedFile.
 
 type ModeledActionName = string
 type TranslatedActionName = string
 export type ContextActions = Record<ModeledActionName, TranslatedActionName>;
 
-export type FileShareCredentials = { accountName : string, password : string, storageType: StorageType, sharedStorageId : RoleInstanceT };
+export type FileShareCredentials = { accountName : string, password : string, storageType: PStorageType, sharedStorageId : RoleInstanceT };
 
-export type StorageType = "mega" | "ppstorage";
+export type PStorageType = "mega" | "ppstorage";
+
+////////////////////////////////////////////
+//// PSHAREDFILE
+////////////////////////////////////////////
+export interface PSharedFile {
+  name: string;
+  size: number;
+  type: string;
+  sharedStorageId: string;
+  storageType: string;
+  url: string;
+}
 
 ////////////////////////////////////////////////////////////////////////////////
 //// CURSOR HANDLING

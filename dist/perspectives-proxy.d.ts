@@ -1,8 +1,8 @@
-import { Perspective, ScreenDefinition, TableFormDef } from "./perspectivesshape";
-export { Perspective, ScreenDefinition, TableFormDef };
+import type { Perspective, ScreenDefinition, TableFormDef } from "./perspectivesshape.d.ts";
+export type * from "./perspectivesshape.d.ts";
 export declare const PDRproxy: Promise<PerspectivesProxy>;
 type Options = {
-    pageHostingPDRPort: (pdr: any) => MessagePort;
+    pageHostingPDRPort?: (pdr: any) => MessagePort;
 };
 export declare function configurePDRproxy(channeltype: "internalChannel" | "sharedWorkerChannel" | "hostPageChannel", options: Options): void;
 interface RequestRecord {
@@ -17,14 +17,14 @@ interface RequestRecord {
     reactStateSetter?: (response: any) => void;
     corrId?: number;
 }
-type RuntimeOptions = {
+export type RuntimeOptions = {
     isFirstInstallation: boolean;
     useSystemVersion: string | null;
     privateKey?: CryptoKey;
     publicKey?: CryptoKey;
     myContextsVersion: string;
 };
-type PouchdbUser = {
+export type PouchdbUser = {
     systemIdentifier: string;
     perspectivesUser: string;
     userName: string;
@@ -206,7 +206,7 @@ type ChatParticipantFields = {
     roleInstance: RoleInstanceT;
     firstname?: ValueT;
     lastname?: ValueT;
-    avatar?: string;
+    avatar?: PSharedFile;
 };
 type ModeledActionName = string;
 type TranslatedActionName = string;
@@ -214,10 +214,18 @@ export type ContextActions = Record<ModeledActionName, TranslatedActionName>;
 export type FileShareCredentials = {
     accountName: string;
     password: string;
-    storageType: StorageType;
+    storageType: PStorageType;
     sharedStorageId: RoleInstanceT;
 };
-export type StorageType = "mega" | "ppstorage";
+export type PStorageType = "mega" | "ppstorage";
+export interface PSharedFile {
+    name: string;
+    size: number;
+    type: string;
+    sharedStorageId: string;
+    storageType: string;
+    url: string;
+}
 declare class Cursor {
     wait(): void;
     restore(): void;
