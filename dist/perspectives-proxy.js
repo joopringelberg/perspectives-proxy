@@ -189,19 +189,25 @@ class SharedWorkerChannel {
     // {serviceWorkerMessage: "runPDR", error: e }
     runPDR(username, pouchdbuser, options) {
         const proxy = this;
-        const p = new Promise(function (resolver, rejecter) {
-            proxy.valueReceivers.runPDR = function (e) {
-                proxy.valueReceivers.runPDR = undefined;
-                if (e.error) {
-                    rejecter(e.errormessage);
-                }
-                else {
-                    resolver(e.data.startSuccesful);
-                }
-            };
-        });
-        proxy.channelId.then(channelId => this.port.postMessage({ proxyRequest: "runPDR", username, pouchdbuser, options, channelId }));
-        return p;
+        // We do not want to run the pdr twice.
+        if (!this.valueReceivers.runPDR) {
+            const p = new Promise(function (resolver, rejecter) {
+                proxy.valueReceivers.runPDR = function (e) {
+                    proxy.valueReceivers.runPDR = undefined;
+                    if (e.error) {
+                        rejecter(e.errormessage);
+                    }
+                    else {
+                        resolver(e.data.startSuccesful);
+                    }
+                };
+            });
+            proxy.channelId.then(channelId => this.port.postMessage({ proxyRequest: "runPDR", username, pouchdbuser, options, channelId }));
+            return p;
+        }
+        else {
+            return Promise.resolve(false);
+        }
     }
     createAccount(perspectivesUser, pouchdbuser, runtimeOptions, optionalIdentityDocument) {
         const proxy = this;

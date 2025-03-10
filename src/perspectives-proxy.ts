@@ -315,25 +315,32 @@ class SharedWorkerChannel
   runPDR (username : string, pouchdbuser : PouchdbUser, options: RuntimeOptions) : Promise<boolean>
   {
     const proxy = this;
-    const p = new Promise(
-      function(resolver, rejecter)
-      {
-        proxy.valueReceivers.runPDR = function( e )
-          {
-            proxy.valueReceivers.runPDR = undefined;
-            if (e.error)
+    // We do not want to run the pdr twice.
+    if (!this.valueReceivers.runPDR)
+    {
+      const p = new Promise(
+        function(resolver, rejecter)
+        {
+          proxy.valueReceivers.runPDR = function( e )
             {
-              rejecter( e.errormessage );
-            }
-            else
-            {
-              resolver( e.data.startSuccesful );
-            }
-          };
-      }
-    ) as Promise<boolean>;
-    proxy.channelId.then( channelId => this.port.postMessage({proxyRequest: "runPDR", username, pouchdbuser, options, channelId }));
-    return p;
+              proxy.valueReceivers.runPDR = undefined;
+              if (e.error)
+              {
+                rejecter( e.errormessage );
+              }
+              else
+              {
+                resolver( e.data.startSuccesful );
+              }
+            };
+        }
+      ) as Promise<boolean>;
+      proxy.channelId.then( channelId => this.port.postMessage({proxyRequest: "runPDR", username, pouchdbuser, options, channelId }));
+      return p;
+    }
+    else {
+      return Promise.resolve( false );
+    }
   }
 
   createAccount (perspectivesUser : string, pouchdbuser : PouchdbUser, runtimeOptions : RuntimeOptions, optionalIdentityDocument : any) : Promise<boolean>  
@@ -639,6 +646,7 @@ export class PerspectivesProxy
     );
   }
 
+  // For the user role type, get his perspectives in the context instance.
   getPerspectives (contextInstance : ContextInstanceT, userRoleType : UserRoleType, receiveValues : PerspectivesReceiver, fireAndForget : SubscriptionType = false, errorHandler? : errorHandler)
   {
     return this.send(
@@ -657,6 +665,8 @@ export class PerspectivesProxy
 
   // { request: "GetPerspective", subject: PerspectiveObjectRoleType OPTIONAL, predicate: RoleInstanceOfContext }
   // No explicit type given for perspectiveObjectRoleType; assume that roleInstanceOfContext has the instance of the role that we want a perspective on.
+  // If a perspectiveObjectRoleType is given, give the perspective on that role type by the users' role in the context.
+  // If not, give the perspective on the role instance itself.
   getPerspective (roleInstanceOfContext : RoleInstanceT, perspectiveObjectRoleType : RoleType = "" as RoleType, receiveValues : PerspectivesReceiver, fireAndForget : SubscriptionType = false, errorHandler? : errorHandler)
   {
     return this.send(
