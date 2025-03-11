@@ -85,7 +85,17 @@ export declare class PerspectivesProxy {
     getLocalRoleSpecialisation(localAspectName: string, contextInstance: ContextInstanceT, receiveValues: RoleTypeReceiver, fireAndForget?: SubscriptionType, errorHandler?: errorHandler): Promise<Unsubscriber>;
     getRoleName(rid: RoleInstanceT, receiveValues: valueReceiver, fireAndForget?: SubscriptionType, errorHandler?: errorHandler): void;
     getBindingType(rolID: RoleInstanceT, receiveValues: RoleTypeReceiver, fireAndForget?: SubscriptionType, errorHandler?: errorHandler): Promise<Unsubscriber>;
-    matchContextName(name: string, receiveValues: valueReceiver, fireAndForget?: SubscriptionType, errorHandler?: errorHandler): Promise<Unsubscriber>;
+    /**
+     * Returns a promise for an array having exactly one object, whose keys are indexed Context Names and whose values are the actual context identifiers.
+     * @param name - The name to match against indexed Context Names. If the empty string, all indexed Context Names will be returned.
+     * @param receiveValues - A function to receive the matched context identifiers.
+     * @param fireAndForget - A boolean indicating whether to unsubscribe immediately.
+     * @param errorHandler - A function to handle errors.
+     * @returns A promise for an array of context identifiers.
+     */
+    matchContextName(name: string, receiveValues: (value: {
+        [key: string]: string;
+    }[]) => void, fireAndForget?: SubscriptionType, errorHandler?: errorHandler): Promise<Unsubscriber>;
     getChatParticipants(rolID: RoleInstanceT, propertyId: PropertyType, receiveValues: ((participants: ChatParticipantFields[]) => void), fireAndForget?: SubscriptionType, errorHandler?: errorHandler): Promise<Unsubscriber>;
     checkBindingP(roleName: RoleType, rolInstance: RoleInstanceT): Promise<boolean>;
     getCouchdbUrl(): Promise<string>;

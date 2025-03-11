@@ -144,7 +144,7 @@ export type TabDef = {
 
 export type ScreenElementDefTagged = {
   elementType: "RowElementD" | "ColumnElementD" | "TableElementD" | "FormElementD" | "MarkDownElementD" | "ChatElementD";
-  elementDef: ScreenElementDef;
+  element: ScreenElementDef;
 }
 
 export type ScreenElementDef = RowElementDef | ColumnElementDef | TableElementDef | FormElementDef | MarkDownElementDef | ChatElementDef;
@@ -161,12 +161,12 @@ export type ColumnElementDef = {
 
 export type TableElementDef = {
   tag: "TableDef";
-  table: WidgetCommonFields;
+  fields: WidgetCommonFields;
 }
 
 export type FormElementDef = {
   tag: "FormDef";
-  form: WidgetCommonFields;
+  fields: WidgetCommonFields;
 }
 
 export type MarkDownElementDef = MarkDownConstant | MarkDownPerspective | MarkDownExpression;

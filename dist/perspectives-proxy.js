@@ -404,6 +404,7 @@ class PerspectivesProxy {
     getMeForContext(externalRoleInstance, receiveValues, fireAndForget = false, errorHandler) {
         return this.send({ request: "GetMeForContext", subject: externalRoleInstance, onlyOnce: fireAndForget }, receiveValues, errorHandler);
     }
+    // For the user role type, get his perspectives in the context instance.
     getPerspectives(contextInstance, userRoleType, receiveValues, fireAndForget = false, errorHandler) {
         return this.send({ request: "GetPerspectives",
             subject: userRoleType,
@@ -415,6 +416,8 @@ class PerspectivesProxy {
     }
     // { request: "GetPerspective", subject: PerspectiveObjectRoleType OPTIONAL, predicate: RoleInstanceOfContext }
     // No explicit type given for perspectiveObjectRoleType; assume that roleInstanceOfContext has the instance of the role that we want a perspective on.
+    // If a perspectiveObjectRoleType is given, give the perspective on that role type by the users' role in the context.
+    // If not, give the perspective on the role instance itself.
     getPerspective(roleInstanceOfContext, perspectiveObjectRoleType = "", receiveValues, fireAndForget = false, errorHandler) {
         return this.send({ request: "GetPerspective",
             subject: perspectiveObjectRoleType,
@@ -462,8 +465,18 @@ class PerspectivesProxy {
     getBindingType(rolID, receiveValues, fireAndForget = false, errorHandler) {
         return this.send({ request: "GetBindingType", subject: rolID, predicate: "", onlyOnce: fireAndForget }, receiveValues, errorHandler);
     }
+    /**
+     * Returns a promise for an array having exactly one object, whose keys are indexed Context Names and whose values are the actual context identifiers.
+     * @param name - The name to match against indexed Context Names. If the empty string, all indexed Context Names will be returned.
+     * @param receiveValues - A function to receive the matched context identifiers.
+     * @param fireAndForget - A boolean indicating whether to unsubscribe immediately.
+     * @param errorHandler - A function to handle errors.
+     * @returns A promise for an array of context identifiers.
+     */
     matchContextName(name, receiveValues, fireAndForget = false, errorHandler) {
-        return this.send({ request: "MatchContextName", subject: name, onlyOnce: fireAndForget }, receiveValues, errorHandler);
+        return this.send({ request: "MatchContextName", subject: name, onlyOnce: fireAndForget }, function (values) {
+            receiveValues(values.map(JSON.parse));
+        }, errorHandler);
     }
     // Returns {roleInstance, firstname, lastname, avatar [OPTIONAL]}
     // rolID is the role that has the Chat properties; 

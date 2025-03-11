@@ -752,12 +752,22 @@ export class PerspectivesProxy
       errorHandler);
   }
 
-  matchContextName( name : string, receiveValues : valueReceiver, fireAndForget : SubscriptionType = false, errorHandler? : errorHandler )
-  {
+  /**
+   * Returns a promise for an array having exactly one object, whose keys are indexed Context Names and whose values are the actual context identifiers.
+   * @param name - The name to match against indexed Context Names. If the empty string, all indexed Context Names will be returned.
+   * @param receiveValues - A function to receive the matched context identifiers.
+   * @param fireAndForget - A boolean indicating whether to unsubscribe immediately.
+   * @param errorHandler - A function to handle errors.
+   * @returns A promise for an array of context identifiers.
+   */
+  matchContextName(name: string, receiveValues: (value: { [key: string]: string }[]) => void, fireAndForget: SubscriptionType = false, errorHandler?: errorHandler) {
     return this.send(
-      {request: "MatchContextName", subject: name, onlyOnce: fireAndForget},
-      receiveValues,
-      errorHandler);
+      { request: "MatchContextName", subject: name, onlyOnce: fireAndForget },
+      function (values) {
+        receiveValues(values.map(JSON.parse));
+      },
+      errorHandler
+    );
   }
 
   // Returns {roleInstance, firstname, lastname, avatar [OPTIONAL]}
