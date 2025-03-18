@@ -208,8 +208,8 @@ export type WhoWhatWhereScreenDef = {
 };
 
 export type TableFormDef = {
-  table: WidgetCommonFields;
-  form: WidgetCommonFields;
+  table: TableElementDef;
+  form: FormElementDef;
 };
 
 export type What = {tag: "TableForms", elements: TableFormDef[]} | {tag: "FreeFormScreen", elements: MainScreenElements}; 
